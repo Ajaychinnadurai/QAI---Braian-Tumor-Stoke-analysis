@@ -14,7 +14,7 @@ import warnings
 warnings.filterwarnings("ignore")
 import numpy as np
 import pandas as pd
-from PIL import Image, ImageOps, ImageFilter
+from PIL import Image, ImageOps, ImageFilter, ImageEnhance
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler, LabelEncoder
 from sklearn.utils.class_weight import compute_class_weight
@@ -31,112 +31,124 @@ class StrokeDataLoader:
     def __init__(self, csv_path: str = STROKE_CSV_PATH):
         self.csv_path = csv_path
         self.scaler = MinMaxScaler()
-        self.encoders: Dict[str, LabelEncoder] = {}
-        self.bmi_mean: float = 28.89
+        self.label_encoders: Dict[str, LabelEncoder] = {}
+        self.feature_names: List[str] = []
         self.class_weights: Dict[int, float] = {}
 
-    def load_and_preprocess(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, pd.DataFrame]:
-        """
-        Loads the real stroke dataset, performs cleaning, imputation, encoding,
-        and MinMaxScaler scaling following Section 4.2 of Base1.pdf.
-        """
+    def load_and_preprocess(self, test_size: float = 0.20, random_state: int = 42) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, pd.DataFrame]:
+        """Loads and preprocesses real EHR stroke records."""
         df = pd.read_csv(self.csv_path)
-        
-        # 1. Drop 'id' column (Section 4.2 Step 4)
+
+        # 1. Drop patient ID
         if "id" in df.columns:
             df = df.drop(columns=["id"])
 
-        # 2. Mean imputation for BMI (Section 4.2 Step 4)
-        self.bmi_mean = float(df["bmi"].mean(skipna=True))
-        df["bmi"] = df["bmi"].fillna(self.bmi_mean)
+        # 2. Impute missing BMI with median value
+        if df["bmi"].isnull().sum() > 0:
+            df["bmi"] = df["bmi"].fillna(df["bmi"].median())
 
-        # 3. Add Alcohol Intake feature (Table 8: F10)
-        # If not present in raw Kaggle, map based on lifestyle/smoking & age heuristics
-        if "alcohol_intake" not in df.columns:
-            # Ordinal: 0 - Unknown, 1 - formerly drank, 2 - never drank, 3 - drinks
-            def map_alcohol(row):
-                if row["smoking_status"] == "smokes":
-                    return 3
-                elif row["smoking_status"] == "formerly smoked":
-                    return 1
-                elif row["smoking_status"] == "never smoked":
-                    return 2
-                return 0
-            df["alcohol_intake"] = df.apply(map_alcohol, axis=1)
+        # 3. Handle Other gender if present
+        df = df[df["gender"] != "Other"].reset_index(drop=True)
 
-        # 4. Categorical Encoding (LabelEncoder)
-        categorical_cols = ["gender", "ever_married", "work_type", "Residence_type", "smoking_status"]
-        for col in categorical_cols:
+        # 4. Encode Categorical Columns
+        cat_cols = ["gender", "ever_married", "work_type", "Residence_type", "smoking_status"]
+        for col in cat_cols:
             le = LabelEncoder()
-            df[col] = le.fit_transform(df[col].astype(str))
-            self.encoders[col] = le
+            df[col] = le.fit_transform(df[col])
+            self.label_encoders[col] = le
 
-        # 5. Extract Features & Target
-        feature_cols = [
-            "age", "hypertension", "heart_disease", "ever_married", 
-            "work_type", "Residence_type", "avg_glucose_level", 
-            "bmi", "smoking_status", "alcohol_intake"
-        ]
-        X = df[feature_cols].copy()
+        # 5. Extract Feature Matrix & Target Vector
+        X = df.drop(columns=["stroke"]).values
         y = df["stroke"].values
+        self.feature_names = [c for c in df.columns if c != "stroke"]
 
-        # 6. Feature Scaling via MinMaxScaler (Section 4.2 Step 2)
-        X_scaled = self.scaler.fit_transform(X)
+        # 6. Compute Balanced Class Weights
+        classes = np.unique(y)
+        weights = compute_class_weight(class_weight="balanced", classes=classes, y=y)
+        self.class_weights = {int(c): float(w) for c, w in zip(classes, weights)}
 
-        # 7. Stratified 80/20 train/test split (Section 4.2 Step 3)
+        # 7. Stratified Train-Test Split
         X_train, X_test, y_train, y_test = train_test_split(
-            X_scaled, y, test_size=0.20, random_state=42, stratify=y
+            X, y, test_size=test_size, random_state=random_state, stratify=y
         )
 
-        # 8. Compute Class Weights (Section 4.2)
-        classes = np.unique(y_train)
-        weights = compute_class_weight(class_weight="balanced", classes=classes, y=y_train)
-        self.class_weights = dict(zip(classes, weights))
+        # 8. Scale Features to [0, 1] using MinMaxScaler
+        X_train_scaled = self.scaler.fit_transform(X_train)
+        X_test_scaled = self.scaler.transform(X_test)
 
-        return X_train, X_test, y_train, y_test, df
+        return X_train_scaled, X_test_scaled, y_train, y_test, df
 
     def transform_single_patient(self, patient_dict: Dict[str, Any]) -> np.ndarray:
-        """Transforms a single clinical record dictionary into normalized model input vector."""
-        # Categorical transformations
-        gender = self.encoders["gender"].transform([str(patient_dict.get("gender", "Male"))])[0] if "gender" in self.encoders else 1
-        ever_married = self.encoders["ever_married"].transform([str(patient_dict.get("ever_married", "Yes"))])[0] if "ever_married" in self.encoders else 1
-        work_type = self.encoders["work_type"].transform([str(patient_dict.get("work_type", "Private"))])[0] if "work_type" in self.encoders else 2
-        residence = self.encoders["Residence_type"].transform([str(patient_dict.get("Residence_type", "Urban"))])[0] if "Residence_type" in self.encoders else 1
-        smoking = self.encoders["smoking_status"].transform([str(patient_dict.get("smoking_status", "never smoked"))])[0] if "smoking_status" in self.encoders else 1
-        
-        age = float(patient_dict.get("age", 50.0))
-        hyp = int(patient_dict.get("hypertension", 0))
-        hd = int(patient_dict.get("heart_disease", 0))
-        glucose = float(patient_dict.get("avg_glucose_level", 100.0))
-        bmi = float(patient_dict.get("bmi", self.bmi_mean))
-        alcohol = int(patient_dict.get("alcohol_intake", 2))
+        """Transforms single patient inputs into a normalized vector."""
+        vec = []
+        vec.append(1 if patient_dict.get("gender") == "Male" else 0)
+        vec.append(float(patient_dict.get("age", 45)))
+        vec.append(1 if patient_dict.get("hypertension") else 0)
+        vec.append(1 if patient_dict.get("heart_disease") else 0)
+        vec.append(1 if patient_dict.get("ever_married", "Yes") == "Yes" else 0)
 
-        features = np.array([[
-            age, hyp, hd, ever_married, work_type, residence, glucose, bmi, smoking, alcohol
-        ]])
-        return self.scaler.transform(features)
+        work_type_map = {"Private": 2, "Self-employed": 3, "Govt_job": 0, "children": 4, "Never_worked": 1}
+        vec.append(work_type_map.get(patient_dict.get("work_type", "Private"), 2))
+
+        vec.append(1 if patient_dict.get("Residence_type", "Urban") == "Urban" else 0)
+        vec.append(float(patient_dict.get("avg_glucose_level", 105.0)))
+        vec.append(float(patient_dict.get("bmi", 28.0)))
+
+        smoking_map = {"formerly smoked": 1, "never smoked": 2, "smokes": 3, "Unknown": 0}
+        vec.append(smoking_map.get(patient_dict.get("smoking_status", "never smoked"), 2))
+
+        raw_array = np.array([vec])
+        return self.scaler.transform(raw_array)
 
 
 # --- 2. Real Brain Tumor MRI Pipeline ---
 
 def crop_brain_contour(img: Image.Image) -> Image.Image:
     """
-    Crops the MRI brain scan to its extreme non-black outer contour bounding box,
-    removing empty background margins so the CNN focuses purely on brain tissue.
+    Crops extreme background and skull contour using Otsu-thresholding,
+    focusing models purely on brain tissue parenchyma and intracranial lesions.
     """
-    gray = np.array(img.convert("L"))
-    mask = gray > 25
-    if np.any(mask):
-        y_indices, x_indices = np.where(mask)
-        y_min, y_max = int(np.min(y_indices)), int(np.max(y_indices))
-        x_min, x_max = int(np.min(x_indices)), int(np.max(x_indices))
-        # Add slight padding
-        h, w = gray.shape
-        y_min, y_max = max(0, y_min - 4), min(h, y_max + 4)
-        x_min, x_max = max(0, x_min - 4), min(w, x_max + 4)
-        if (y_max - y_min > 20) and (x_max - x_min > 20):
-            return img.crop((x_min, y_min, x_max, y_max))
-    return img
+    np_img = np.array(img.convert("L"))
+    
+    # Simple Otsu threshold
+    hist, bin_edges = np.histogram(np_img, bins=256, range=(0, 256))
+    total = np_img.size
+    current_max, threshold = 0, 0
+    sum_total = np.dot(np.arange(256), hist)
+    sum_back, weight_back = 0, 0
+
+    for i in range(256):
+        weight_back += hist[i]
+        if weight_back == 0:
+            continue
+        weight_fore = total - weight_back
+        if weight_fore == 0:
+            break
+        sum_back += i * hist[i]
+        mean_back = sum_back / weight_back
+        mean_fore = (sum_total - sum_back) / weight_fore
+        var_between = weight_back * weight_fore * ((mean_back - mean_fore) ** 2)
+        if var_between > current_max:
+            current_max = var_between
+            threshold = i
+
+    thresh_val = max(threshold, 35)
+    mask = np_img > thresh_val
+    coords = np.argwhere(mask)
+    if coords.size == 0:
+        return img
+    
+    y0, x0 = coords.min(axis=0)
+    y1, x1 = coords.max(axis=0) + 1
+    
+    # Add small margin
+    h, w = np_img.shape
+    y0 = max(0, y0 - 4)
+    x0 = max(0, x0 - 4)
+    y1 = min(h, y1 + 4)
+    x1 = min(w, x1 + 4)
+    
+    return img.crop((x0, y0, x1, y1))
 
 def apply_qmft_denoising(img: Image.Image) -> Image.Image:
     """Simulates Quantum Matched Filter (QMFT) active noise reduction."""

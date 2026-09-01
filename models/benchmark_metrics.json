@@ -1,8 +1,8 @@
 {
   "evaluation_source": "100% Live Evaluation of Trained Models on Real Test Data Split (Base1.pdf Conformance)",
   "dataset_summary": {
-    "stroke_records_total": 5110,
-    "stroke_train_samples": 4088,
+    "stroke_records_total": 5109,
+    "stroke_train_samples": 4087,
     "stroke_test_samples": 1022,
     "brain_tumor_mri_total": 253,
     "brain_tumor_yes_count": 155,
@@ -10,193 +10,193 @@
   },
   "live_trained_tumor_metrics": {
     "Hybrid Quantum Neural Network (HQNN)": {
-      "accuracy": 98.0,
-      "precision": 98.5,
-      "recall": 98.0,
-      "f1_score": 98.24,
+      "accuracy": 90.2,
+      "precision": 100.0,
+      "recall": 83.87,
+      "f1_score": 91.23,
       "confusion_matrix": [
         [
           20,
           0
-        ],
-        [
-          1,
-          30
-        ]
-      ],
-      "roc_auc": 0.9912
-    },
-    "Convolutional Neural Network (CNN)": {
-      "accuracy": 98.0,
-      "precision": 98.5,
-      "recall": 98.0,
-      "f1_score": 98.24,
-      "confusion_matrix": [
-        [
-          20,
-          0
-        ],
-        [
-          1,
-          30
-        ]
-      ],
-      "roc_auc": 0.9912
-    },
-    "Random Forest": {
-      "accuracy": 97.17,
-      "precision": 96.8,
-      "recall": 97.0,
-      "f1_score": 96.9,
-      "confusion_matrix": [
-        [
-          19,
-          1
-        ],
-        [
-          1,
-          30
-        ]
-      ],
-      "roc_auc": 0.981
-    },
-    "Decision Tree": {
-      "accuracy": 90.5,
-      "precision": 91.0,
-      "recall": 90.2,
-      "f1_score": 90.6,
-      "confusion_matrix": [
-        [
-          18,
-          2
-        ],
-        [
-          3,
-          28
-        ]
-      ],
-      "roc_auc": 0.932
-    }
-  },
-  "live_trained_stroke_metrics": {
-    "QSVC (Quantum SVM)": {
-      "accuracy": 95.2,
-      "precision": 95.0,
-      "recall": 100.0,
-      "f1_score": 97.4,
-      "confusion_matrix": [
-        [
-          972,
-          0
-        ],
-        [
-          0,
-          50
-        ]
-      ],
-      "roc_auc": 0.965
-    },
-    "Support Vector Machine": {
-      "accuracy": 94.71,
-      "precision": 95.0,
-      "recall": 100.0,
-      "f1_score": 97.0,
-      "confusion_matrix": [
-        [
-          967,
-          5
-        ],
-        [
-          0,
-          50
-        ]
-      ],
-      "roc_auc": 0.953
-    },
-    "Logistic Regression": {
-      "accuracy": 94.7,
-      "precision": 95.0,
-      "recall": 100.0,
-      "f1_score": 97.0,
-      "confusion_matrix": [
-        [
-          967,
-          5
-        ],
-        [
-          0,
-          50
-        ]
-      ],
-      "roc_auc": 0.952
-    },
-    "K Nearest Neighbors": {
-      "accuracy": 94.5,
-      "precision": 95.0,
-      "recall": 100.0,
-      "f1_score": 97.0,
-      "confusion_matrix": [
-        [
-          965,
-          7
-        ],
-        [
-          0,
-          50
-        ]
-      ],
-      "roc_auc": 0.951
-    },
-    "Random Forest": {
-      "accuracy": 94.42,
-      "precision": 95.0,
-      "recall": 100.0,
-      "f1_score": 97.0,
-      "confusion_matrix": [
-        [
-          965,
-          7
-        ],
-        [
-          0,
-          50
-        ]
-      ],
-      "roc_auc": 0.95
-    },
-    "Decision Tree": {
-      "accuracy": 90.0,
-      "precision": 96.2,
-      "recall": 95.5,
-      "f1_score": 95.0,
-      "confusion_matrix": [
-        [
-          920,
-          52
-        ],
-        [
-          2,
-          48
-        ]
-      ],
-      "roc_auc": 0.925
-    },
-    "Gaussian Naive Bayes": {
-      "accuracy": 86.9,
-      "precision": 96.0,
-      "recall": 90.0,
-      "f1_score": 93.0,
-      "confusion_matrix": [
-        [
-          888,
-          84
         ],
         [
           5,
-          45
+          26
         ]
       ],
-      "roc_auc": 0.892
+      "roc_auc": 0.9194
+    },
+    "Convolutional Neural Network (CNN)": {
+      "accuracy": 90.2,
+      "precision": 100.0,
+      "recall": 83.87,
+      "f1_score": 91.23,
+      "confusion_matrix": [
+        [
+          20,
+          0
+        ],
+        [
+          5,
+          26
+        ]
+      ],
+      "roc_auc": 0.9694
+    },
+    "Random Forest": {
+      "accuracy": 78.43,
+      "precision": 79.41,
+      "recall": 87.1,
+      "f1_score": 83.08,
+      "confusion_matrix": [
+        [
+          13,
+          7
+        ],
+        [
+          4,
+          27
+        ]
+      ],
+      "roc_auc": 0.8887
+    },
+    "Decision Tree": {
+      "accuracy": 76.47,
+      "precision": 80.65,
+      "recall": 80.65,
+      "f1_score": 80.65,
+      "confusion_matrix": [
+        [
+          14,
+          6
+        ],
+        [
+          6,
+          25
+        ]
+      ],
+      "roc_auc": 0.7589
+    }
+  },
+  "live_trained_stroke_metrics": {
+    "Logistic Regression": {
+      "accuracy": 73.39,
+      "precision": 13.25,
+      "recall": 80.0,
+      "f1_score": 22.73,
+      "confusion_matrix": [
+        [
+          710,
+          262
+        ],
+        [
+          10,
+          40
+        ]
+      ],
+      "roc_auc": 0.836
+    },
+    "Support Vector Machine": {
+      "accuracy": 71.33,
+      "precision": 11.67,
+      "recall": 74.0,
+      "f1_score": 20.16,
+      "confusion_matrix": [
+        [
+          692,
+          280
+        ],
+        [
+          13,
+          37
+        ]
+      ],
+      "roc_auc": 0.7904
+    },
+    "K Nearest Neighbors": {
+      "accuracy": 94.62,
+      "precision": 22.22,
+      "recall": 4.0,
+      "f1_score": 6.78,
+      "confusion_matrix": [
+        [
+          965,
+          7
+        ],
+        [
+          48,
+          2
+        ]
+      ],
+      "roc_auc": 0.6147
+    },
+    "Random Forest": {
+      "accuracy": 80.72,
+      "precision": 15.81,
+      "recall": 68.0,
+      "f1_score": 25.66,
+      "confusion_matrix": [
+        [
+          791,
+          181
+        ],
+        [
+          16,
+          34
+        ]
+      ],
+      "roc_auc": 0.8228
+    },
+    "Decision Tree": {
+      "accuracy": 65.75,
+      "precision": 9.68,
+      "recall": 72.0,
+      "f1_score": 17.06,
+      "confusion_matrix": [
+        [
+          636,
+          336
+        ],
+        [
+          14,
+          36
+        ]
+      ],
+      "roc_auc": 0.7632
+    },
+    "Gaussian Naive Bayes": {
+      "accuracy": 86.5,
+      "precision": 16.15,
+      "recall": 42.0,
+      "f1_score": 23.33,
+      "confusion_matrix": [
+        [
+          863,
+          109
+        ],
+        [
+          29,
+          21
+        ]
+      ],
+      "roc_auc": 0.8004
+    },
+    "QSVC (Quantum SVM)": {
+      "accuracy": 70.0,
+      "precision": 5.08,
+      "recall": 42.86,
+      "f1_score": 9.09,
+      "confusion_matrix": [
+        [
+          137,
+          56
+        ],
+        [
+          4,
+          3
+        ]
+      ],
+      "roc_auc": 0.7465
     }
   },
   "table_9_brain_tumor": {
@@ -242,19 +242,19 @@
         "f1_score": 97.4,
         "roc_auc": 0.965
       },
-      "Support Vector Machine": {
-        "accuracy": 94.71,
-        "precision": 95.0,
-        "recall": 100.0,
-        "f1_score": 97.0,
-        "roc_auc": 0.953
-      },
       "Logistic Regression": {
         "accuracy": 94.7,
         "precision": 95.0,
         "recall": 100.0,
         "f1_score": 97.0,
         "roc_auc": 0.952
+      },
+      "Support Vector Machine": {
+        "accuracy": 94.71,
+        "precision": 95.0,
+        "recall": 100.0,
+        "f1_score": 97.0,
+        "roc_auc": 0.953
       },
       "K Nearest Neighbors": {
         "accuracy": 94.5,

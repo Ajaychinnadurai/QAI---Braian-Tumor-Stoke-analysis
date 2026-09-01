@@ -48,15 +48,15 @@ def train_and_save_all():
     print(f"  --> Saved stroke loader/scaler to: {stroke_scaler_path}")
 
     # 2. Brain Tumor MRI Pipeline
-    print("\n[2/2] Loading Real Brain Tumor MRI Scans (253 images)...")
+    print("\n[2/2] Loading 100% Real Kaggle Brain Tumor MRI Scans (253 images)...")
     tumor_loader = TumorDataLoader()
     X_img, y_img, paths = tumor_loader.load_real_dataset()
-    print(f"  Loaded {len(X_img)} MRI scans ({sum(y_img==1)} Tumor YES, {sum(y_img==0)} Tumor NO).")
+    print(f"  Loaded {len(X_img)} Real MRI scans ({sum(y_img==1)} Tumor YES, {sum(y_img==0)} Tumor NO).")
     
     print("  Extracting multi-dimensional spatial & texture feature vectors...")
     X_feats = tumor_loader.extract_tabular_features_from_images(X_img)
     
-    print("  Training Brain Tumor Suite (CNN, Random Forest, Decision Tree, HQNN)...")
+    print("  Training Brain Tumor Suite (Fast Vectorized HQNN, CNN, Random Forest, Decision Tree)...")
     tumor_suite = BrainTumorModelSuite()
     tumor_suite.train_all(X_img, X_feats, y_img)
     
