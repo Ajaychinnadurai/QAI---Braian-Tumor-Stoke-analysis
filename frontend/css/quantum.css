@@ -1,0 +1,174 @@
+/* ==========================================================================
+   QUANTUM CIRCUIT VISUALIZATION - LIGHT MINIMALIST STYLES
+   Directly renders Fig. 8 and Table 5 quantum structures from Base1.pdf
+   ========================================================================== */
+
+.circuit-canvas-container {
+  background: #F8FAFC;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 26px 20px;
+  position: relative;
+  overflow-x: auto;
+}
+
+.quantum-circuit-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-width: 640px;
+  position: relative;
+}
+
+.qubit-wire-row {
+  display: flex;
+  align-items: center;
+  position: relative;
+  height: 50px;
+}
+
+.qubit-label {
+  width: 65px;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.wire-line {
+  position: absolute;
+  left: 65px;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  background: #CBD5E1;
+  z-index: 1;
+}
+
+.classical-wire-line {
+  position: absolute;
+  left: 65px;
+  right: 0;
+  top: calc(50% - 2px);
+  height: 1px;
+  background: #94A3B8;
+  box-shadow: 0 3px 0 #94A3B8;
+  z-index: 1;
+}
+
+.gates-track {
+  margin-left: 65px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  z-index: 2;
+  position: relative;
+  flex: 1;
+}
+
+.qgate {
+  height: 44px;
+  min-width: 48px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  user-select: none;
+}
+
+.qgate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.gate-u {
+  background: #EF4444;
+  color: #FFFFFF;
+}
+
+.gate-h {
+  background: #0284C7;
+  color: #FFFFFF;
+}
+
+.gate-measure {
+  background: #FFFFFF;
+  color: #0284C7;
+  border: 1px dashed #0284C7;
+}
+
+.cnot-control-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #0284C7;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.2);
+  z-index: 5;
+}
+
+.cnot-target-cross {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #0284C7;
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0284C7;
+  z-index: 5;
+}
+
+/* Bloch Sphere Coordinate Visualizer */
+.bloch-card {
+  background: #F8FAFC;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  text-align: center;
+}
+
+.bloch-sphere-visual {
+  width: 84px;
+  height: 84px;
+  margin: 10px auto;
+  border-radius: 50%;
+  border: 2px solid #0284C7;
+  background: radial-gradient(circle at 35% 35%, #E0F2FE, #F1F5F9);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bloch-axis-x, .bloch-axis-y {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.bloch-axis-x { width: 100%; height: 1px; }
+.bloch-axis-y { height: 100%; width: 1px; }
+
+.bloch-vector-pointer {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #EF4444;
+  box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+  transition: all 0.25s ease;
+}

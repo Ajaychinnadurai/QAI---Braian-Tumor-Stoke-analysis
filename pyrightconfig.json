@@ -1,0 +1,15 @@
+{
+  "venvPath": "d:/qai",
+  "venv": ".venv",
+  "include": [
+    "backend",
+    "tests",
+    "."
+  ],
+  "extraPaths": [
+    "d:/qai/.venv/Lib/site-packages",
+    "d:/qai"
+  ],
+  "reportMissingImports": "none",
+  "reportMissingTypeStubs": false
+}
