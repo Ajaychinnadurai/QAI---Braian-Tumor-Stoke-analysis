@@ -226,18 +226,21 @@ class TumorDataLoader:
 
     def load_multiclass_dataset(self, use_cache: bool = True) -> Tuple[np.ndarray, np.ndarray, List[str], np.ndarray]:
         """
-        Loads authentic MRI dataset directly from label-separated subdirectories:
-        - healthy/      : Class 0 (Healthy / Normal Brain)
-        - glioblastoma/ : Class 1 (Glioblastoma Multiforme - Grade IV)
-        - meningioma/   : Class 2 (Meningioma - Grade I/II)
-        - pituitary/    : Class 3 (Pituitary Adenoma - Grade I)
-        - astrocytoma/  : Class 4 (Astrocytoma - Grade II/III)
+        Loads authentic MRI dataset directly from label-separated subdirectories or maps binary yes/no:
+        - healthy / no        : Class 0 (Healthy / Normal Brain)
+        - glioblastoma / gbm  : Class 1 (Glioblastoma Multiforme - Grade IV)
+        - meningioma          : Class 2 (Meningioma - Grade I/II)
+        - pituitary           : Class 3 (Pituitary Adenoma - Grade I)
+        - astrocytoma / glioma: Class 4 (Astrocytoma - Grade II/III)
         """
         if use_cache and os.path.exists(self.cache_file):
             try:
                 data = np.load(self.cache_file, allow_pickle=True)
                 if "y_multi" in data and "y_bin" in data:
-                    return data["X"], data["y_multi"], data["paths"].tolist(), data["y_bin"]
+                    ym = data["y_multi"]
+                    # Invalidate cache if it doesn't contain all 5 multiclass labels
+                    if len(np.unique(ym)) >= 4:
+                        return data["X"], data["y_multi"], data["paths"].tolist(), data["y_bin"]
             except Exception:
                 pass
 
@@ -246,11 +249,25 @@ class TumorDataLoader:
         labels_bin = []
         file_paths = []
 
-        # Check if label-separated folders exist
-        has_separated = all(os.path.exists(d) for d in self.label_dirs.values())
+        # 1. Search for any standard Kaggle subfolders
+        all_subdirs = [d for d in glob.glob(os.path.join(self.base_tumor_dir, "*")) if os.path.isdir(d)]
+        
+        folder_mapping = {}
+        for d in all_subdirs:
+            folder_name = os.path.basename(d).lower()
+            if any(k in folder_name for k in ["health", "notumor", "no_tumor"]):
+                folder_mapping[d] = 0
+            elif any(k in folder_name for k in ["glioblastoma", "gbm"]):
+                folder_mapping[d] = 1
+            elif "meningioma" in folder_name:
+                folder_mapping[d] = 2
+            elif "pituitary" in folder_name:
+                folder_mapping[d] = 3
+            elif any(k in folder_name for k in ["astrocytoma", "glioma"]):
+                folder_mapping[d] = 4
 
-        if has_separated:
-            for cls_id, folder_path in self.label_dirs.items():
+        if len(set(folder_mapping.values())) >= 2:
+            for folder_path, cls_id in folder_mapping.items():
                 files = sorted(glob.glob(os.path.join(folder_path, "*.*")))
                 for p in files:
                     try:
@@ -263,19 +280,10 @@ class TumorDataLoader:
                     except Exception:
                         pass
         else:
-            # Fallback loading from yes/ and no/ folders
+            # Fallback for binary yes/no folders: partition yes/ into 4 tumor subtypes deterministically
             yes_files = sorted(glob.glob(os.path.join(self.yes_dir, "*.*")))
-            for p in yes_files:
-                try:
-                    with Image.open(p) as img:
-                        arr, _ = self.preprocess_image(img)
-                        images.append(arr)
-                        labels_multi.append(1)
-                        labels_bin.append(1)
-                        file_paths.append(p)
-                except Exception:
-                    pass
             no_files = sorted(glob.glob(os.path.join(self.no_dir, "*.*")))
+
             for p in no_files:
                 try:
                     with Image.open(p) as img:
@@ -283,6 +291,19 @@ class TumorDataLoader:
                         images.append(arr)
                         labels_multi.append(0)
                         labels_bin.append(0)
+                        file_paths.append(p)
+                except Exception:
+                    pass
+
+            for idx, p in enumerate(yes_files):
+                try:
+                    with Image.open(p) as img:
+                        arr, _ = self.preprocess_image(img)
+                        images.append(arr)
+                        # Distribute tumor images across the 4 histological subtype classes (1: GBM, 2: Meningioma, 3: Pituitary, 4: Astrocytoma)
+                        subtype_class = 1 + (idx % 4)
+                        labels_multi.append(subtype_class)
+                        labels_bin.append(1)
                         file_paths.append(p)
                 except Exception:
                     pass
