@@ -50,7 +50,14 @@ def train_and_save_all():
     # 2. Brain Tumor MRI Pipeline
     print("\n[2/2] Loading 100% Real Kaggle Brain Tumor MRI Scans with 5-Class Subtypes...")
     tumor_loader = TumorDataLoader()
-    X_img, y_multi, paths, y_bin = tumor_loader.load_multiclass_dataset()
+    # Force fresh scan when new images are downloaded or dataset changes
+    cache_file = tumor_loader.cache_file
+    if os.path.exists(cache_file):
+        try:
+            os.remove(cache_file)
+        except Exception:
+            pass
+    X_img, y_multi, paths, y_bin = tumor_loader.load_multiclass_dataset(use_cache=False)
     print(f"  Loaded {len(X_img)} Real MRI scans across 5 Histological Subtype Categories:")
     print(f"    - Healthy Brain (No Tumor): {sum(y_multi == 0)}")
     print(f"    - Glioblastoma (GBM): {sum(y_multi == 1)}")
