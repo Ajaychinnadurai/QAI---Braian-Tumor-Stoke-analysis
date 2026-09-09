@@ -593,6 +593,10 @@ class BrainTumorModelSuite:
         else:
             feats_input = img_feats
 
+        rf_n_feats = getattr(self.rf_model, "n_features_in_", 17)
+        if feats_input.shape[1] > rf_n_feats:
+            feats_input = feats_input[:, :rf_n_feats]
+
         cnn_probs = self.cnn_model.predict_proba(img_input)[0]
         hqnn_probs = self.hqnn_model.predict_proba(feats_input, np.expand_dims(cnn_probs, axis=0))[0]
         rf_probs = self.rf_model.predict_proba(feats_input)[0]
