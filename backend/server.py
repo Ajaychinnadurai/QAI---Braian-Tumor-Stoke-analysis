@@ -227,82 +227,88 @@ class HealthcareRequestHandler(BaseHTTPRequestHandler):
                 self.send_error(404, "Not Found")
 
     def do_POST(self):
-        url_path = urllib.parse.urlparse(self.path).path
-        content_len = int(self.headers.get("Content-Length", 0))
-        post_data = self.rfile.read(content_len)
         try:
-            payload = json.loads(post_data.decode("utf-8")) if post_data else {}
-        except Exception:
-            payload = {}
+            url_path = urllib.parse.urlparse(self.path).path
+            content_len = int(self.headers.get("Content-Length", 0))
+            post_data = self.rfile.read(content_len) if content_len > 0 else b""
+            try:
+                payload = json.loads(post_data.decode("utf-8")) if post_data else {}
+            except Exception:
+                payload = {}
 
-        if url_path == "/api/predict/stroke":
-            # Real stroke prediction
-            x_scaled = stroke_loader.transform_single_patient(payload)
-            result = stroke_suite.predict_single_patient(x_scaled)
-            recommendations = generate_preventive_recommendations(result["overall_risk_percentage"], payload)
-            result["recommendations"] = recommendations
-            self._send_json(result)
+            if url_path == "/api/predict/stroke":
+                # Real stroke prediction
+                x_scaled = stroke_loader.transform_single_patient(payload)
+                result = stroke_suite.predict_single_patient(x_scaled)
+                recommendations = generate_preventive_recommendations(result["overall_risk_percentage"], payload)
+                result["recommendations"] = recommendations
+                self._send_json(result)
 
-        elif url_path == "/api/predict/tumor":
-            # Real brain tumor MRI prediction
-            image_raw = None
-            if "image_base64" in payload and payload["image_base64"]:
-                b64_data = payload["image_base64"]
-                if "," in b64_data:
-                    b64_data = b64_data.split(",")[1]
-                img_bytes = base64.b64decode(b64_data)
-                image_raw = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-            elif "sample_name" in payload and payload["sample_name"]:
-                # Load from real dataset
-                sname = payload["sample_name"]
-                stype = payload.get("sample_type", "healthy")
-                p = os.path.join(DATA_DIR, "brain_tumor", stype, sname)
-                if not os.path.exists(p):
-                    for sub in ["healthy", "glioblastoma", "meningioma", "pituitary", "astrocytoma"]:
-                        alt_p = os.path.join(DATA_DIR, "brain_tumor", sub, sname)
-                        if os.path.exists(alt_p):
-                            p = alt_p
-                            break
-                if os.path.exists(p):
-                    image_raw = Image.open(p).convert("RGB")
+            elif url_path == "/api/predict/tumor":
+                # Real brain tumor MRI prediction
+                image_raw = None
+                if "image_base64" in payload and payload["image_base64"]:
+                    b64_data = payload["image_base64"]
+                    if "," in b64_data:
+                        b64_data = b64_data.split(",")[1]
+                    img_bytes = base64.b64decode(b64_data)
+                    image_raw = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+                elif "sample_name" in payload and payload["sample_name"]:
+                    # Load from real dataset
+                    sname = payload["sample_name"]
+                    stype = payload.get("sample_type", "healthy")
+                    p = os.path.join(DATA_DIR, "brain_tumor", stype, sname)
+                    if not os.path.exists(p):
+                        for sub in ["healthy", "glioblastoma", "meningioma", "pituitary", "astrocytoma"]:
+                            alt_p = os.path.join(DATA_DIR, "brain_tumor", sub, sname)
+                            if os.path.exists(alt_p):
+                                p = alt_p
+                                break
+                    if os.path.exists(p):
+                        image_raw = Image.open(p).convert("RGB")
 
-            if image_raw is None:
-                self._send_json({"error": "No valid MRI image provided"}, status=400)
-                return
+                if image_raw is None:
+                    self._send_json({"error": "No valid MRI image provided"}, status=400)
+                    return
 
-            # Apply Preprocessing (Contour cropping, CLAHE enhancement, normalization)
-            arr, img_resized = tumor_loader.preprocess_image(image_raw)
-            img_qmft = apply_qmft_denoising(img_resized)
-            img_qelbp = apply_qe_lbp_filter(img_resized)
-            img_clahe = apply_clahe_enhancement(img_resized)
+                # Apply Preprocessing (Contour cropping, CLAHE enhancement, normalization)
+                arr, img_resized = tumor_loader.preprocess_image(image_raw)
+                img_qmft = apply_qmft_denoising(img_resized)
+                img_qelbp = apply_qe_lbp_filter(img_resized)
+                img_clahe = apply_clahe_enhancement(img_resized)
 
-            # Extract tabular features for comparative models
-            feats = tumor_loader.extract_tabular_features_from_images(np.array([arr]))
+                # Extract tabular features for comparative models
+                feats = tumor_loader.extract_tabular_features_from_images(np.array([arr]))
 
-            # Run inference on Deep 2D PyTorch CNN and comparative models
-            result = tumor_suite.predict_single_mri(arr, feats)
-            result["filtered_previews"] = {
-                "original": f"data:image/png;base64,{image_to_base64(img_resized)}",
-                "qmft_denoised": f"data:image/png;base64,{image_to_base64(img_qmft)}",
-                "qe_lbp_edges": f"data:image/png;base64,{image_to_base64(img_qelbp)}",
-                "clahe_enhanced": f"data:image/png;base64,{image_to_base64(img_clahe)}"
-            }
-            self._send_json(result)
+                # Run inference on Deep 2D PyTorch CNN and comparative models
+                result = tumor_suite.predict_single_mri(arr, feats)
+                result["filtered_previews"] = {
+                    "original": f"data:image/png;base64,{image_to_base64(img_resized)}",
+                    "qmft_denoised": f"data:image/png;base64,{image_to_base64(img_qmft)}",
+                    "qe_lbp_edges": f"data:image/png;base64,{image_to_base64(img_qelbp)}",
+                    "clahe_enhanced": f"data:image/png;base64,{image_to_base64(img_clahe)}"
+                }
+                self._send_json(result)
 
-        elif url_path == "/api/quantum/simulate":
-            # Real quantum circuit simulation
-            t1 = float(payload.get("theta1", np.pi/4))
-            p1 = float(payload.get("phi1", np.pi/2))
-            l1 = float(payload.get("lam1", 0.0))
-            t2 = float(payload.get("theta2", np.pi/4))
-            p2 = float(payload.get("phi2", np.pi/5))
-            l2 = float(payload.get("lam2", np.pi/2))
+            elif url_path == "/api/quantum/simulate":
+                # Real quantum circuit simulation
+                t1 = float(payload.get("theta1", np.pi/4))
+                p1 = float(payload.get("phi1", np.pi/2))
+                l1 = float(payload.get("lam1", 0.0))
+                t2 = float(payload.get("theta2", np.pi/4))
+                p2 = float(payload.get("phi2", np.pi/5))
+                l2 = float(payload.get("lam2", np.pi/2))
 
-            sim_res = simulate_figure_8_circuit(t1, p1, l1, t2, p2, l2)
-            self._send_json(sim_res)
+                sim_res = simulate_figure_8_circuit(t1, p1, l1, t2, p2, l2)
+                self._send_json(sim_res)
 
-        else:
-            self.send_error(404, "Endpoint not found")
+            else:
+                self.send_error(404, "Endpoint not found")
+
+        except Exception as err:
+            import traceback
+            traceback.print_exc()
+            self._send_json({"error": f"Inference processing exception: {str(err)}"}, status=500)
 
 def start_server(port: int = 8080):
     server_address = ("", port)
