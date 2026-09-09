@@ -115,13 +115,18 @@ def generate_preventive_recommendations(risk_score: float, patient_data: dict) -
 
 
 def sanitize_nan(obj: Any) -> Any:
-    if isinstance(obj, float):
-        if np.isnan(obj) or np.isinf(obj):
+    if isinstance(obj, (np.integer, int)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, float)):
+        val = float(obj)
+        if np.isnan(val) or np.isinf(val):
             return 0.0
-        return obj
+        return val
+    elif isinstance(obj, np.ndarray):
+        return [sanitize_nan(x) for x in obj.tolist()]
     elif isinstance(obj, dict):
         return {k: sanitize_nan(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
+    elif isinstance(obj, (list, tuple)):
         return [sanitize_nan(v) for v in obj]
     return obj
 
