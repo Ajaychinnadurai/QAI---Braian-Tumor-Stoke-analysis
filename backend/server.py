@@ -14,7 +14,7 @@ import warnings
 warnings.filterwarnings("ignore")
 import sys
 from typing import Any, Dict, List, Tuple
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import numpy as np
 import pandas as pd
 from PIL import Image
@@ -306,7 +306,7 @@ class HealthcareRequestHandler(BaseHTTPRequestHandler):
 
 def start_server(port: int = 8080):
     server_address = ("", port)
-    httpd = HTTPServer(server_address, HealthcareRequestHandler)
+    httpd = ThreadingHTTPServer(server_address, HealthcareRequestHandler)
     print("\n============================================================")
     print("AI-Driven QML Healthcare Analytics Server running at:")
     print(f"   http://localhost:{port}")
