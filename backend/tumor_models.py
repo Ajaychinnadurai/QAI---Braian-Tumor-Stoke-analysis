@@ -221,8 +221,8 @@ class PyTorchCNNTumorClassifier:
             n_batches = 0
             for i in range(0, n_samples, self.batch_size):
                 idx = perm[i:i + self.batch_size]
-                xb = X_tr_t[idx]
-                yb = y_tr_t[idx]
+                xb = X_tr_t[idx].to(self.device)
+                yb = y_tr_t[idx].to(self.device)
 
                 # Rich augmentation: horizontal flip, vertical flip, small noise
                 if np.random.rand() > 0.5:
@@ -252,7 +252,7 @@ class PyTorchCNNTumorClassifier:
                 val_probs_list = []
                 with torch.no_grad():
                     for vi in range(0, len(X_val_t), 64):
-                        v_out = self.model(X_val_t[vi:vi + 64])
+                        v_out = self.model(X_val_t[vi:vi + 64].to(self.device))
                         val_probs_list.append(torch.softmax(v_out, dim=1).cpu().numpy())
                 val_probs = np.vstack(val_probs_list)
                 val_preds = np.argmax(val_probs, axis=1)
@@ -278,7 +278,7 @@ class PyTorchCNNTumorClassifier:
         probs_list = []
         with torch.no_grad():
             for i in range(0, len(X_t), 64):
-                outputs = self.model(X_t[i:i + 64])
+                outputs = self.model(X_t[i:i + 64].to(self.device))
                 probs = torch.softmax(outputs, dim=1).cpu().numpy()
                 probs_list.append(probs)
         return np.vstack(probs_list)
