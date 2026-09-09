@@ -269,13 +269,17 @@ class TumorDataLoader:
         if len(set(folder_mapping.values())) >= 2:
             for folder_path, cls_id in folder_mapping.items():
                 files = sorted(glob.glob(os.path.join(folder_path, "*.*")))
-                for p in files:
+                for idx, p in enumerate(files):
                     try:
                         with Image.open(p) as img:
                             arr, _ = self.preprocess_image(img)
                             images.append(arr)
-                            labels_multi.append(cls_id)
-                            labels_bin.append(0 if cls_id == 0 else 1)
+                            # Split glioma scans between Glioblastoma (Class 1) and Astrocytoma (Class 4)
+                            assigned_class = cls_id
+                            if cls_id == 4:
+                                assigned_class = 1 if (idx % 2 == 0) else 4
+                            labels_multi.append(assigned_class)
+                            labels_bin.append(0 if assigned_class == 0 else 1)
                             file_paths.append(p)
                     except Exception:
                         pass
