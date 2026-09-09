@@ -12,12 +12,17 @@ import base64
 import urllib.parse
 import warnings
 warnings.filterwarnings("ignore")
+import sys
 from typing import Any, Dict, List, Tuple
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import numpy as np
 import pandas as pd
 from PIL import Image
 import joblib
+
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
 from backend.data_loader import (
     StrokeDataLoader, TumorDataLoader, 
@@ -29,7 +34,6 @@ from backend.quantum_engine import (
     simulate_figure_8_circuit, generate_bell_states, QuantumSimulator, unitary_gate, H, X, Z
 )
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 MODELS_DIR = os.path.join(BASE_DIR, "models")
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -48,6 +52,8 @@ with open(os.path.join(MODELS_DIR, "benchmark_metrics.json"), "r", encoding="utf
 
 # Load real dataset samples for quick dashboard exploration
 REAL_STROKE_DF = pd.read_csv(os.path.join(DATA_DIR, "stroke", "healthcare-dataset-stroke-data.csv"))
+REAL_STROKE_DF["bmi"] = REAL_STROKE_DF["bmi"].fillna(28.89)
+REAL_STROKE_DF = REAL_STROKE_DF.fillna(0)
 
 def image_to_base64(img: Image.Image, format: str = "PNG") -> str:
     buffered = io.BytesIO()
@@ -108,9 +114,22 @@ def generate_preventive_recommendations(risk_score: float, patient_data: dict) -
     return recs
 
 
+def sanitize_nan(obj: Any) -> Any:
+    if isinstance(obj, float):
+        if np.isnan(obj) or np.isinf(obj):
+            return 0.0
+        return obj
+    elif isinstance(obj, dict):
+        return {k: sanitize_nan(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_nan(v) for v in obj]
+    return obj
+
+
 class HealthcareRequestHandler(BaseHTTPRequestHandler):
     def _send_json(self, data: Any, status: int = 200):
-        body = json.dumps(data).encode("utf-8")
+        clean_data = sanitize_nan(data)
+        body = json.dumps(clean_data).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
@@ -155,9 +174,19 @@ class HealthcareRequestHandler(BaseHTTPRequestHandler):
             return
 
         elif url_path == "/api/dataset/samples":
-            # Return real sample MRI scans and real patient records
-            yes_files = [os.path.basename(p) for p in os.listdir(os.path.join(DATA_DIR, "brain_tumor", "yes"))[:8]]
-            no_files = [os.path.basename(p) for p in os.listdir(os.path.join(DATA_DIR, "brain_tumor", "no"))[:8]]
+            # Return real sample MRI scans separated by subtype and real patient records
+            subtypes = ["healthy", "glioblastoma", "meningioma", "pituitary", "astrocytoma"]
+            mri_samples = {}
+            for st in subtypes:
+                st_dir = os.path.join(DATA_DIR, "brain_tumor", st)
+                if os.path.exists(st_dir):
+                    mri_samples[f"{st}_scans"] = [os.path.basename(p) for p in sorted(os.listdir(st_dir))[:6]]
+                else:
+                    mri_samples[f"{st}_scans"] = []
+
+            # Backward compatibility
+            mri_samples["yes_scans"] = mri_samples.get("glioblastoma_scans", []) + mri_samples.get("meningioma_scans", [])
+            mri_samples["no_scans"] = mri_samples.get("healthy_scans", [])
             
             # 6 sample real stroke cases from healthcare-dataset-stroke-data.csv
             stroke_cases = REAL_STROKE_DF[REAL_STROKE_DF["stroke"] == 1].head(3).to_dict(orient="records")
@@ -165,10 +194,7 @@ class HealthcareRequestHandler(BaseHTTPRequestHandler):
             sample_patients = stroke_cases + healthy_cases
 
             self._send_json({
-                "mri_samples": {
-                    "yes_scans": yes_files,
-                    "no_scans": no_files
-                },
+                "mri_samples": mri_samples,
                 "patient_samples": sample_patients
             })
             return
@@ -229,8 +255,14 @@ class HealthcareRequestHandler(BaseHTTPRequestHandler):
             elif "sample_name" in payload and payload["sample_name"]:
                 # Load from real dataset
                 sname = payload["sample_name"]
-                stype = payload.get("sample_type", "yes")
+                stype = payload.get("sample_type", "healthy")
                 p = os.path.join(DATA_DIR, "brain_tumor", stype, sname)
+                if not os.path.exists(p):
+                    for sub in ["healthy", "glioblastoma", "meningioma", "pituitary", "astrocytoma"]:
+                        alt_p = os.path.join(DATA_DIR, "brain_tumor", sub, sname)
+                        if os.path.exists(alt_p):
+                            p = alt_p
+                            break
                 if os.path.exists(p):
                     image_raw = Image.open(p).convert("RGB")
 
@@ -279,6 +311,7 @@ def start_server(port: int = 8080):
     print("AI-Driven QML Healthcare Analytics Server running at:")
     print(f"   http://localhost:{port}")
     print("============================================================\n")
+    sys.stdout.flush()
     httpd.serve_forever()
 
 if __name__ == "__main__":

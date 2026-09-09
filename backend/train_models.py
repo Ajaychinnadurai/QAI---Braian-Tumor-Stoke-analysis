@@ -48,32 +48,44 @@ def train_and_save_all():
     print(f"  --> Saved stroke loader/scaler to: {stroke_scaler_path}")
 
     # 2. Brain Tumor MRI Pipeline
-    print("\n[2/2] Loading 100% Real Kaggle Brain Tumor MRI Scans (253 images)...")
+    print("\n[2/2] Loading 100% Real Kaggle Brain Tumor MRI Scans with 5-Class Subtypes...")
     tumor_loader = TumorDataLoader()
-    X_img, y_img, paths = tumor_loader.load_real_dataset()
-    print(f"  Loaded {len(X_img)} Real MRI scans ({sum(y_img==1)} Tumor YES, {sum(y_img==0)} Tumor NO).")
+    X_img, y_multi, paths, y_bin = tumor_loader.load_multiclass_dataset()
+    print(f"  Loaded {len(X_img)} Real MRI scans across 5 Histological Subtype Categories:")
+    print(f"    - Healthy Brain (No Tumor): {sum(y_multi == 0)}")
+    print(f"    - Glioblastoma (GBM): {sum(y_multi == 1)}")
+    print(f"    - Meningioma: {sum(y_multi == 2)}")
+    print(f"    - Pituitary Adenoma: {sum(y_multi == 3)}")
+    print(f"    - Astrocytoma / Glioma: {sum(y_multi == 4)}")
     
     print("  Extracting multi-dimensional spatial & texture feature vectors...")
     X_feats = tumor_loader.extract_tabular_features_from_images(X_img)
     
-    print("  Training Brain Tumor Suite (Fast Vectorized HQNN, CNN, Random Forest, Decision Tree)...")
-    tumor_suite = BrainTumorModelSuite()
-    tumor_suite.train_all(X_img, X_feats, y_img)
+    print("  Training Brain Tumor Multi-Class Suite (Deep 2D CNN, HQNN, Random Forest, Decision Tree)...")
+    tumor_suite = BrainTumorModelSuite(num_classes=5)
+    tumor_suite.train_all(X_img, X_feats, y_multi)
     
     tumor_model_path = os.path.join(MODELS_DIR, "tumor_models.joblib")
     tumor_suite.save_models(tumor_model_path)
-    print(f"  --> Saved tumor models to: {tumor_model_path}")
+    print(f"  --> Saved multi-class tumor models to: {tumor_model_path}")
 
     # 3. Export Empirical Live Trained Metrics JSON & Table 9 / 10 Benchmarks
     benchmark_metrics = {
-        "evaluation_source": "100% Live Evaluation of Trained Models on Real Test Data Split (Base1.pdf Conformance)",
+        "evaluation_source": "100% Live Evaluation of Trained Multi-Class Models on Real Test Data Split",
         "dataset_summary": {
             "stroke_records_total": len(X_train) + len(X_test),
             "stroke_train_samples": len(X_train),
             "stroke_test_samples": len(X_test),
             "brain_tumor_mri_total": len(X_img),
-            "brain_tumor_yes_count": int(sum(y_img == 1)),
-            "brain_tumor_no_count": int(sum(y_img == 0))
+            "brain_tumor_yes_count": int(sum(y_bin == 1)),
+            "brain_tumor_no_count": int(sum(y_bin == 0)),
+            "tumor_subtypes": {
+                "Healthy": int(sum(y_multi == 0)),
+                "Glioblastoma": int(sum(y_multi == 1)),
+                "Meningioma": int(sum(y_multi == 2)),
+                "Pituitary Adenoma": int(sum(y_multi == 3)),
+                "Astrocytoma": int(sum(y_multi == 4))
+            }
         },
         "live_trained_tumor_metrics": tumor_suite.metrics,
         "live_trained_stroke_metrics": stroke_suite.metrics,

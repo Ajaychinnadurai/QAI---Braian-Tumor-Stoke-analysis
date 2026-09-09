@@ -254,15 +254,30 @@
               <input type="file" id="mriFileInput" accept="image/*" style="display: none;">
             </div>
 
-            <!-- Real Presets from Kaggle Dataset -->
-            <div style="margin-top: 20px;">
-              <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Real Kaggle Scans (Tumor Positive):</label>
-              <div id="mriYesPresets" class="preset-container"></div>
+            <!-- Real Presets from Kaggle Dataset - Separated by Subtype -->
+            <div style="margin-top: 16px;">
+              <label style="font-size: 0.8rem; font-weight: 700; color: #EF4444;">🔴 Glioblastoma (GBM) Scans:</label>
+              <div id="mriGbmPresets" class="preset-container" style="margin-top: 4px;"></div>
             </div>
 
-            <div style="margin-top: 14px;">
-              <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Real Kaggle Scans (Healthy / No Tumor):</label>
-              <div id="mriNoPresets" class="preset-container"></div>
+            <div style="margin-top: 10px;">
+              <label style="font-size: 0.8rem; font-weight: 700; color: #F59E0B;">🟠 Meningioma Scans:</label>
+              <div id="mriMeningiomaPresets" class="preset-container" style="margin-top: 4px;"></div>
+            </div>
+
+            <div style="margin-top: 10px;">
+              <label style="font-size: 0.8rem; font-weight: 700; color: #3B82F6;">🔵 Pituitary Adenoma Scans:</label>
+              <div id="mriPituitaryPresets" class="preset-container" style="margin-top: 4px;"></div>
+            </div>
+
+            <div style="margin-top: 10px;">
+              <label style="font-size: 0.8rem; font-weight: 700; color: #8B5CF6;">🟣 Astrocytoma Scans:</label>
+              <div id="mriAstrocytomaPresets" class="preset-container" style="margin-top: 4px;"></div>
+            </div>
+
+            <div style="margin-top: 10px;">
+              <label style="font-size: 0.8rem; font-weight: 700; color: #10B981;">🟢 Healthy Brain Scans:</label>
+              <div id="mriHealthyPresets" class="preset-container" style="margin-top: 4px;"></div>
             </div>
 
             <button id="btnAnalyzeMri" class="btn btn-quantum" style="width: 100%; margin-top: 24px;">
@@ -293,47 +308,60 @@
             <!-- Diagnosis Result Banner -->
             <div id="tumorDiagnosisBanner" class="diagnosis-banner" style="margin-top: 20px;">
               <div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                  <span id="tumorSubtypeBadge" class="chip" style="background: #E2E8F0; color: #1E293B; font-weight: 700; font-size: 0.82rem; padding: 4px 10px;">Subtype Pending</span>
+                  <span id="tumorGradeBadge" class="chip" style="background: #F1F5F9; color: #64748B; font-size: 0.75rem;">WHO Grade: --</span>
+                </div>
                 <h4 id="tumorDiagnosisTitle" style="font-family: var(--font-heading); font-size: 1.15rem; font-weight: 700;">Awaiting MRI Analysis</h4>
-                <p id="tumorDiagnosisDesc" style="font-size: 0.82rem; margin-top: 2px;">Load a scan to run CNN and Hybrid QNN detection.</p>
+                <p id="tumorDiagnosisDesc" style="font-size: 0.82rem; margin-top: 2px;">Load a scan to run CNN and Hybrid QNN multi-subtype detection.</p>
               </div>
               <div style="text-align: right;">
-                <div style="font-size: 0.72rem; text-transform: uppercase; font-weight: 600;">Tumor Likelihood</div>
+                <div style="font-size: 0.72rem; text-transform: uppercase; font-weight: 600;">Diagnosis Confidence</div>
                 <div id="tumorProbValue" style="font-family: var(--font-heading); font-size: 1.8rem; font-weight: 700;">--%</div>
               </div>
             </div>
 
-            <!-- Model Breakdown Progress Bars -->
-            <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;">
-              <div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 4px;">
-                  <span><strong>Convolutional Neural Network (CNN)</strong></span>
-                  <span id="cnnProbText">--%</span>
-                </div>
-                <div class="state-bar-track"><div id="cnnProbBar" class="state-bar-fill" style="width: 0%;"></div></div>
+            <!-- Tailored Clinical Protocol Card -->
+            <div id="tumorProtocolCard" style="display: none; margin-top: 14px; padding: 14px; background: #F8FAFC; border: 1px solid var(--border-color); border-radius: var(--radius-md); border-left: 4px solid #3B82F6;">
+              <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Recommended Clinical & Surgical Protocol:
               </div>
+              <p id="tumorProtocolText" style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.45; margin: 0;"></p>
+            </div>
 
-              <div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 4px;">
-                  <span><strong>HQNN (Hybrid Quantum Neural Network)</strong></span>
-                  <span id="hqnnProbText">--%</span>
-                </div>
-                <div class="state-bar-track"><div id="hqnnProbBar" class="state-bar-fill" style="width: 0%; background: linear-gradient(90deg, #A855F7, #EC4899);"></div></div>
+            <!-- 5-Class Subtype Probability Distribution -->
+            <div style="margin-top: 16px;">
+              <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">
+                Tumor Histological Subtype Distribution:
               </div>
-
-              <div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 4px;">
-                  <span><strong>Random Forest Classifier</strong></span>
-                  <span id="rfProbText">--%</span>
-                </div>
-                <div class="state-bar-track"><div id="rfProbBar" class="state-bar-fill" style="width: 0%; background: linear-gradient(90deg, #10B981, #059669);"></div></div>
+              <div id="subtypeDistributionBars" style="display: flex; flex-direction: column; gap: 10px;">
+                <!-- Dynamically populated -->
               </div>
+            </div>
 
-              <div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 4px;">
-                  <span><strong>Decision Tree Classifier</strong></span>
-                  <span id="dtProbText">--%</span>
+            <!-- Individual AI & Quantum Model Consensus -->
+            <div style="margin-top: 16px;">
+              <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">
+                Model Architecture Consensus:
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;" id="modelConsensusGrid">
+                <div style="padding: 8px 12px; background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 6px;">
+                  <div style="font-size: 0.72rem; color: var(--text-muted);">Deep 2D PyTorch CNN</div>
+                  <div id="cnnSubtypeText" style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">--</div>
                 </div>
-                <div class="state-bar-track"><div id="dtProbBar" class="state-bar-fill" style="width: 0%; background: linear-gradient(90deg, #F59E0B, #D97706);"></div></div>
+                <div style="padding: 8px 12px; background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 6px;">
+                  <div style="font-size: 0.72rem; color: var(--text-muted);">HQNN (Quantum Variational)</div>
+                  <div id="hqnnSubtypeText" style="font-size: 0.85rem; font-weight: 700; color: #8B5CF6;">--</div>
+                </div>
+                <div style="padding: 8px 12px; background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 6px;">
+                  <div style="font-size: 0.72rem; color: var(--text-muted);">Random Forest Classifier</div>
+                  <div id="rfSubtypeText" style="font-size: 0.85rem; font-weight: 700; color: #10B981;">--</div>
+                </div>
+                <div style="padding: 8px 12px; background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 6px;">
+                  <div style="font-size: 0.72rem; color: var(--text-muted);">Decision Tree Classifier</div>
+                  <div id="dtSubtypeText" style="font-size: 0.85rem; font-weight: 700; color: #F59E0B;">--</div>
+                </div>
               </div>
             </div>
 
@@ -707,62 +735,74 @@
       </section>
 
       <!-- ================================================================= -->
-      <!-- VIEW 5: BENCHMARK MATRIX & METRICS                                -->
+      <!-- VIEW 5: BENCHMARK MATRIX & EMPIRICAL VS PAPER COMPARISON         -->
       <!-- ================================================================= -->
       <section id="viewBenchmarks" class="view-section">
         
-        <!-- Table 9: Brain Tumor -->
+        <!-- Table 9: Brain Tumor Comparison -->
         <div class="card" style="margin-bottom: 24px;">
-          <div class="card-header">
-            <h3>
-              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-              Brain Tumor Models Live Performance (253 Authentic MRI Scans)
-            </h3>
-            <span id="tumorTopBadge" class="badge-top-algo">Live Trained Evaluation</span>
+          <div class="card-header" style="flex-wrap: wrap; gap: 8px;">
+            <div>
+              <h3>
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                Brain Tumor: Project Empirical Metrics vs. Base1.pdf Paper (Table 9)
+              </h3>
+              <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">Direct side-by-side comparison of actual project test split accuracy against published paper benchmarks.</p>
+            </div>
+            <span id="tumorTopBadge" class="badge-top-algo">Comparative Evaluation</span>
           </div>
 
-          <table class="benchmark-table">
-            <thead>
-              <tr>
-                <th>Algorithm</th>
-                <th>Accuracy (%)</th>
-                <th>Precision (%)</th>
-                <th>Recall (%)</th>
-                <th>F1 Score (%)</th>
-                <th>ROC AUC</th>
-              </tr>
-            </thead>
-            <tbody id="tumorBenchmarkBody">
-              <!-- Rendered dynamically from live trained models -->
-            </tbody>
-          </table>
+          <div style="overflow-x: auto;">
+            <table class="benchmark-table">
+              <thead>
+                <tr>
+                  <th>Algorithm / Model</th>
+                  <th>Project Empirical Acc (%)</th>
+                  <th>Base1.pdf Target Acc (%)</th>
+                  <th>Project F1 (%)</th>
+                  <th>Base1.pdf F1 (%)</th>
+                  <th>Empirical ROC AUC</th>
+                  <th>Accuracy Variance</th>
+                </tr>
+              </thead>
+              <tbody id="tumorBenchmarkBody">
+                <!-- Rendered dynamically from live trained models vs paper targets -->
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <!-- Table 10: Brain Stroke -->
+        <!-- Table 10: Brain Stroke Comparison -->
         <div class="card" style="margin-bottom: 24px;">
-          <div class="card-header">
-            <h3>
-              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-              Brain Stroke Models Live Performance (5,110 Authentic EHR Records)
-            </h3>
-            <span id="strokeTopBadge" class="badge-top-algo">Live Trained Evaluation</span>
+          <div class="card-header" style="flex-wrap: wrap; gap: 8px;">
+            <div>
+              <h3>
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                Brain Stroke: Project Empirical Metrics vs. Base1.pdf Paper (Table 10)
+              </h3>
+              <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">Direct side-by-side comparison of real EHR clinical test accuracy against published paper benchmarks.</p>
+            </div>
+            <span id="strokeTopBadge" class="badge-top-algo">Comparative Evaluation</span>
           </div>
 
-          <table class="benchmark-table">
-            <thead>
-              <tr>
-                <th>Algorithm</th>
-                <th>Accuracy (%)</th>
-                <th>Precision (%)</th>
-                <th>Recall (%)</th>
-                <th>F1 Score (%)</th>
-                <th>ROC AUC</th>
-              </tr>
-            </thead>
-            <tbody id="strokeBenchmarkBody">
-              <!-- Rendered dynamically from live trained models -->
-            </tbody>
-          </table>
+          <div style="overflow-x: auto;">
+            <table class="benchmark-table">
+              <thead>
+                <tr>
+                  <th>Algorithm / Model</th>
+                  <th>Project Empirical Acc (%)</th>
+                  <th>Base1.pdf Target Acc (%)</th>
+                  <th>Project F1 (%)</th>
+                  <th>Base1.pdf F1 (%)</th>
+                  <th>Empirical ROC AUC</th>
+                  <th>Accuracy Variance</th>
+                </tr>
+              </thead>
+              <tbody id="strokeBenchmarkBody">
+                <!-- Rendered dynamically from live trained models vs paper targets -->
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Live Confusion Matrices -->

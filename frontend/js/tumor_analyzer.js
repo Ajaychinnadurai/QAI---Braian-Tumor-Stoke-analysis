@@ -67,7 +67,7 @@ function handleFileSelection(file) {
   reader.readAsDataURL(file);
 }
 
-export function selectSampleMri(filename, type = "yes") {
+export function selectSampleMri(filename, type = "healthy") {
   const imgUrl = `/data/brain_tumor/${type}/${filename}`;
   const previewImg = document.getElementById("previewImage");
   previewImg.src = imgUrl;
@@ -75,7 +75,8 @@ export function selectSampleMri(filename, type = "yes") {
   previewImg.dataset.sampleType = type;
   previewImg.dataset.base64 = "";
   
-  document.getElementById("selectedMriName").textContent = `Real Kaggle MRI: ${filename} (${type.toUpperCase()})`;
+  const prettyType = type.charAt(0).toUpperCase() + type.slice(1);
+  document.getElementById("selectedMriName").textContent = `Real MRI: ${filename} (${prettyType})`;
   document.getElementById("mriPlaceholderText").style.display = "none";
   previewImg.style.display = "block";
   resetFilterTabs();
@@ -85,30 +86,27 @@ export function selectSampleMri(filename, type = "yes") {
 async function loadSampleMriPresets() {
   try {
     const samples = await API.getDatasetSamples();
-    const yesContainer = document.getElementById("mriYesPresets");
-    const noContainer = document.getElementById("mriNoPresets");
+    const config = [
+      { id: "mriGbmPresets", key: "glioblastoma_scans", type: "glioblastoma" },
+      { id: "mriMeningiomaPresets", key: "meningioma_scans", type: "meningioma" },
+      { id: "mriPituitaryPresets", key: "pituitary_scans", type: "pituitary" },
+      { id: "mriAstrocytomaPresets", key: "astrocytoma_scans", type: "astrocytoma" },
+      { id: "mriHealthyPresets", key: "healthy_scans", type: "healthy" }
+    ];
 
-    if (yesContainer && samples.mri_samples.yes_scans) {
-      yesContainer.innerHTML = "";
-      samples.mri_samples.yes_scans.slice(0, 4).forEach(file => {
-        const chip = document.createElement("button");
-        chip.className = "preset-chip";
-        chip.textContent = file;
-        chip.onclick = () => selectSampleMri(file, "yes");
-        yesContainer.appendChild(chip);
-      });
-    }
-
-    if (noContainer && samples.mri_samples.no_scans) {
-      noContainer.innerHTML = "";
-      samples.mri_samples.no_scans.slice(0, 4).forEach(file => {
-        const chip = document.createElement("button");
-        chip.className = "preset-chip";
-        chip.textContent = file;
-        chip.onclick = () => selectSampleMri(file, "no");
-        noContainer.appendChild(chip);
-      });
-    }
+    config.forEach(({ id, key, type }) => {
+      const container = document.getElementById(id);
+      if (container && samples.mri_samples && samples.mri_samples[key]) {
+        container.innerHTML = "";
+        samples.mri_samples[key].slice(0, 4).forEach(file => {
+          const chip = document.createElement("button");
+          chip.className = "preset-chip";
+          chip.textContent = file;
+          chip.onclick = () => selectSampleMri(file, type);
+          container.appendChild(chip);
+        });
+      }
+    });
   } catch (err) {
     console.error("Failed loading MRI samples:", err);
   }
@@ -160,39 +158,80 @@ async function runTumorAnalysis() {
     currentFilteredImages = res.filtered_previews;
     updateFilterPreview();
 
-    // Render results
+    // Render subtype banner & badges
     const banner = document.getElementById("tumorDiagnosisBanner");
+    const subtypeBadge = document.getElementById("tumorSubtypeBadge");
+    const gradeBadge = document.getElementById("tumorGradeBadge");
     const titleEl = document.getElementById("tumorDiagnosisTitle");
     const descEl = document.getElementById("tumorDiagnosisDesc");
     const probEl = document.getElementById("tumorProbValue");
-    const confEl = document.getElementById("tumorConfValue");
 
     if (banner) banner.className = `diagnosis-banner ${res.tumor_detected ? 'positive' : 'negative'}`;
+    if (subtypeBadge) {
+      subtypeBadge.textContent = res.tumor_short_name || (res.tumor_detected ? "Tumor Detected" : "Healthy");
+      subtypeBadge.style.background = res.badge_color ? `${res.badge_color}20` : '#E2E8F0';
+      subtypeBadge.style.color = res.badge_color || '#1E293B';
+      subtypeBadge.style.border = `1px solid ${res.badge_color || '#CBD5E1'}`;
+    }
+    if (gradeBadge) {
+      gradeBadge.textContent = res.tumor_grade || "WHO Grade: --";
+    }
     if (titleEl) titleEl.textContent = res.prediction || "Diagnosis Complete";
     if (descEl) descEl.textContent = res.severity_assessment || "";
-    if (probEl) probEl.textContent = `${res.probability_percentage}%`;
-    if (confEl) confEl.textContent = `${res.confidence_score}%`;
+    if (probEl) probEl.textContent = `${res.confidence_score}%`;
 
-    // Model breakdown
-    const cnnBar = document.getElementById("cnnProbBar");
-    const cnnText = document.getElementById("cnnProbText");
-    if (cnnBar) cnnBar.style.width = `${res.individual_models.CNN}%`;
-    if (cnnText) cnnText.textContent = `${res.individual_models.CNN}%`;
+    // Render clinical protocol
+    const protocolCard = document.getElementById("tumorProtocolCard");
+    const protocolText = document.getElementById("tumorProtocolText");
+    if (protocolCard && protocolText) {
+      if (res.recommended_protocol) {
+        protocolCard.style.display = "block";
+        protocolText.textContent = res.recommended_protocol;
+      } else {
+        protocolCard.style.display = "none";
+      }
+    }
 
-    const hqnnBar = document.getElementById("hqnnProbBar");
-    const hqnnText = document.getElementById("hqnnProbText");
-    if (hqnnBar) hqnnBar.style.width = `${res.individual_models["HQNN (Quantum)"]}%`;
-    if (hqnnText) hqnnText.textContent = `${res.individual_models["HQNN (Quantum)"]}%`;
+    // Render 5-class probability distribution bars
+    const distContainer = document.getElementById("subtypeDistributionBars");
+    if (distContainer && res.class_probabilities) {
+      distContainer.innerHTML = "";
+      const colors = {
+        "Healthy (No Tumor)": "#10B981",
+        "Glioblastoma": "#EF4444",
+        "Meningioma": "#F59E0B",
+        "Pituitary Adenoma": "#3B82F6",
+        "Astrocytoma": "#8B5CF6"
+      };
 
-    const rfBar = document.getElementById("rfProbBar");
-    const rfText = document.getElementById("rfProbText");
-    if (rfBar) rfBar.style.width = `${res.individual_models["Random Forest"]}%`;
-    if (rfText) rfText.textContent = `${res.individual_models["Random Forest"]}%`;
+      for (const [subtype, pct] of Object.entries(res.class_probabilities)) {
+        const item = document.createElement("div");
+        const color = colors[subtype] || "#0284C7";
+        item.innerHTML = `
+          <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 4px;">
+            <span><strong>${subtype}</strong></span>
+            <span style="font-weight: 700; color: ${color};">${pct}%</span>
+          </div>
+          <div class="state-bar-track">
+            <div class="state-bar-fill" style="width: ${pct}%; background: ${color};"></div>
+          </div>
+        `;
+        distContainer.appendChild(item);
+      }
+    }
 
-    const dtBar = document.getElementById("dtProbBar");
-    const dtText = document.getElementById("dtProbText");
-    if (dtBar) dtBar.style.width = `${res.individual_models["Decision Tree"]}%`;
-    if (dtText) dtText.textContent = `${res.individual_models["Decision Tree"]}%`;
+    // Render Model Architecture Consensus
+    if (res.individual_models) {
+      const cnnEl = document.getElementById("cnnSubtypeText");
+      const hqnnEl = document.getElementById("hqnnSubtypeText");
+      const rfEl = document.getElementById("rfSubtypeText");
+      const dtEl = document.getElementById("dtSubtypeText");
+
+      if (cnnEl) cnnEl.textContent = res.individual_models["Deep 2D CNN"] || "--";
+      if (hqnnEl) hqnnEl.textContent = res.individual_models["HQNN (Quantum)"] || "--";
+      if (rfEl) rfEl.textContent = res.individual_models["Random Forest"] || "--";
+      if (dtEl) dtEl.textContent = res.individual_models["Decision Tree"] || "--";
+    }
 
   } catch (err) {
     alert(`Inference failed: ${err.message}`);

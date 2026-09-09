@@ -20,6 +20,13 @@ from sklearn.preprocessing import MinMaxScaler, LabelEncoder
 from sklearn.utils.class_weight import compute_class_weight
 from typing import Tuple, Dict, Any, List
 
+# SMOTE for stroke class-imbalance oversampling (optional but recommended)
+try:
+    from imblearn.over_sampling import SMOTE
+    HAS_SMOTE = True
+except ImportError:
+    HAS_SMOTE = False
+
 DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))
 STROKE_CSV_PATH = os.path.join(DATA_DIR, "stroke", "healthcare-dataset-stroke-data.csv")
 TUMOR_YES_DIR = os.path.join(DATA_DIR, "brain_tumor", "yes")
@@ -35,8 +42,15 @@ class StrokeDataLoader:
         self.feature_names: List[str] = []
         self.class_weights: Dict[int, float] = {}
 
-    def load_and_preprocess(self, test_size: float = 0.20, random_state: int = 42) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, pd.DataFrame]:
-        """Loads and preprocesses real EHR stroke records."""
+    def load_and_preprocess(
+        self, test_size: float = 0.20, random_state: int = 42, oversample: bool = True
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, pd.DataFrame]:
+        """Loads and preprocesses real EHR stroke records.
+        
+        Args:
+            oversample: If True and imblearn is installed, applies SMOTE to the
+                        training split to fix severe stroke class imbalance (~5% positive).
+        """
         df = pd.read_csv(self.csv_path)
 
         # 1. Drop patient ID
@@ -67,14 +81,23 @@ class StrokeDataLoader:
         weights = compute_class_weight(class_weight="balanced", classes=classes, y=y)
         self.class_weights = {int(c): float(w) for c, w in zip(classes, weights)}
 
-        # 7. Stratified Train-Test Split
+        # 7. Stratified Train-Test Split (keep test set clean — no leakage)
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=test_size, random_state=random_state, stratify=y
         )
 
-        # 8. Scale Features to [0, 1] using MinMaxScaler
+        # 8. Scale Features to [0, 1] using MinMaxScaler (fit on train only)
         X_train_scaled = self.scaler.fit_transform(X_train)
-        X_test_scaled = self.scaler.transform(X_test)
+        X_test_scaled  = self.scaler.transform(X_test)
+
+        # 9. SMOTE Oversampling on training set ONLY (never on test set)
+        if oversample and HAS_SMOTE:
+            smote = SMOTE(random_state=random_state, k_neighbors=5)
+            X_train_scaled, y_train = smote.fit_resample(X_train_scaled, y_train)
+            print(f"  [SMOTE] Resampled training set: {dict(zip(*np.unique(y_train, return_counts=True)))}")
+        elif oversample and not HAS_SMOTE:
+            print("  [SMOTE] imbalanced-learn not found. Run: pip install imbalanced-learn")
+            print("  [SMOTE] Falling back to class_weight='balanced' only.")
 
         return X_train_scaled, X_test_scaled, y_train, y_test, df
 
@@ -165,10 +188,26 @@ def apply_clahe_enhancement(img: Image.Image) -> Image.Image:
     return ImageOps.autocontrast(img, cutoff=2)
 
 class TumorDataLoader:
-    def __init__(self, yes_dir: str = TUMOR_YES_DIR, no_dir: str = TUMOR_NO_DIR, target_size: Tuple[int, int] = (128, 128)):
-        self.yes_dir = yes_dir
-        self.no_dir = no_dir
+    def __init__(
+        self, 
+        base_tumor_dir: str = os.path.join(DATA_DIR, "brain_tumor"),
+        target_size: Tuple[int, int] = (128, 128), 
+        cache_file: str = os.path.join(DATA_DIR, "brain_tumor_cache.npz")
+    ):
+        self.base_tumor_dir = base_tumor_dir
         self.target_size = target_size
+        self.cache_file = cache_file
+
+        # Separated label folders
+        self.label_dirs = {
+            0: os.path.join(base_tumor_dir, "healthy"),
+            1: os.path.join(base_tumor_dir, "glioblastoma"),
+            2: os.path.join(base_tumor_dir, "meningioma"),
+            3: os.path.join(base_tumor_dir, "pituitary"),
+            4: os.path.join(base_tumor_dir, "astrocytoma")
+        }
+        self.yes_dir = os.path.join(base_tumor_dir, "yes")
+        self.no_dir = os.path.join(base_tumor_dir, "no")
 
     def preprocess_image(self, img: Image.Image) -> Tuple[np.ndarray, Image.Image]:
         """Applies contour cropping, CLAHE enhancement, and resizing."""
@@ -178,73 +217,165 @@ class TumorDataLoader:
         arr = np.array(resized, dtype=np.float32) / 255.0  # Normalized [0, 1]
         return arr, resized
 
-    def load_real_dataset(self) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+    def load_real_dataset(self, use_cache: bool = True) -> Tuple[np.ndarray, np.ndarray, List[str]]:
         """
-        Loads all authentic MRI images from yes/ and no/ folders.
-        Returns:
-            X: Array of shape (N, H, W, 3) normalized to [0, 1]
-            y: Array of shape (N,) where 1 = YES (tumor), 0 = NO (no tumor)
-            file_paths: List of original file paths
+        Loads all authentic MRI images with binary labels (1 = Tumor, 0 = Healthy).
         """
+        X, y_multi, paths, y_bin = self.load_multiclass_dataset(use_cache=use_cache)
+        return X, y_bin, paths
+
+    def load_multiclass_dataset(self, use_cache: bool = True) -> Tuple[np.ndarray, np.ndarray, List[str], np.ndarray]:
+        """
+        Loads authentic MRI dataset directly from label-separated subdirectories:
+        - healthy/      : Class 0 (Healthy / Normal Brain)
+        - glioblastoma/ : Class 1 (Glioblastoma Multiforme - Grade IV)
+        - meningioma/   : Class 2 (Meningioma - Grade I/II)
+        - pituitary/    : Class 3 (Pituitary Adenoma - Grade I)
+        - astrocytoma/  : Class 4 (Astrocytoma - Grade II/III)
+        """
+        if use_cache and os.path.exists(self.cache_file):
+            try:
+                data = np.load(self.cache_file, allow_pickle=True)
+                if "y_multi" in data and "y_bin" in data:
+                    return data["X"], data["y_multi"], data["paths"].tolist(), data["y_bin"]
+            except Exception:
+                pass
+
         images = []
-        labels = []
+        labels_multi = []
+        labels_bin = []
         file_paths = []
 
-        # Load YES (Tumor present = 1)
-        yes_files = sorted(glob.glob(os.path.join(self.yes_dir, "*.*")))
-        for p in yes_files:
-            try:
-                with Image.open(p) as img:
-                    arr, _ = self.preprocess_image(img)
-                    images.append(arr)
-                    labels.append(1)
-                    file_paths.append(p)
-            except Exception:
-                pass
+        # Check if label-separated folders exist
+        has_separated = all(os.path.exists(d) for d in self.label_dirs.values())
 
-        # Load NO (Healthy = 0)
-        no_files = sorted(glob.glob(os.path.join(self.no_dir, "*.*")))
-        for p in no_files:
-            try:
-                with Image.open(p) as img:
-                    arr, _ = self.preprocess_image(img)
-                    images.append(arr)
-                    labels.append(0)
-                    file_paths.append(p)
-            except Exception:
-                pass
+        if has_separated:
+            for cls_id, folder_path in self.label_dirs.items():
+                files = sorted(glob.glob(os.path.join(folder_path, "*.*")))
+                for p in files:
+                    try:
+                        with Image.open(p) as img:
+                            arr, _ = self.preprocess_image(img)
+                            images.append(arr)
+                            labels_multi.append(cls_id)
+                            labels_bin.append(0 if cls_id == 0 else 1)
+                            file_paths.append(p)
+                    except Exception:
+                        pass
+        else:
+            # Fallback loading from yes/ and no/ folders
+            yes_files = sorted(glob.glob(os.path.join(self.yes_dir, "*.*")))
+            for p in yes_files:
+                try:
+                    with Image.open(p) as img:
+                        arr, _ = self.preprocess_image(img)
+                        images.append(arr)
+                        labels_multi.append(1)
+                        labels_bin.append(1)
+                        file_paths.append(p)
+                except Exception:
+                    pass
+            no_files = sorted(glob.glob(os.path.join(self.no_dir, "*.*")))
+            for p in no_files:
+                try:
+                    with Image.open(p) as img:
+                        arr, _ = self.preprocess_image(img)
+                        images.append(arr)
+                        labels_multi.append(0)
+                        labels_bin.append(0)
+                        file_paths.append(p)
+                except Exception:
+                    pass
 
         X = np.array(images, dtype=np.float32)
-        y = np.array(labels, dtype=np.int32)
-        return X, y, file_paths
+        y_multi = np.array(labels_multi, dtype=np.int64)
+        y_bin = np.array(labels_bin, dtype=np.int32)
+
+        # Save to fast NPZ cache
+        try:
+            np.savez_compressed(self.cache_file, X=X, y_bin=y_bin, paths=np.array(file_paths), y_multi=y_multi)
+        except Exception:
+            pass
+
+        return X, y_multi, file_paths, y_bin
 
     def extract_tabular_features_from_images(self, X_images: np.ndarray) -> np.ndarray:
         """
-        Extracts statistical/texture features (mean, std, percentiles, gradients)
-        for Decision Tree and Random Forest comparative baselines (Table 9).
+        Extracts rich spatial, statistical, and texture radiomic features from MRI images 
+        for Random Forest, Decision Tree, and HQNN models.
+        Vectorized NumPy implementation for high efficiency.
         """
-        features = []
-        for img in X_images:
-            # Grayscale channel
-            gray = np.mean(img, axis=-1)
-            f_mean = np.mean(gray)
-            f_std = np.std(gray)
-            f_max = np.max(gray)
-            f_min = np.min(gray)
-            f_p25 = np.percentile(gray, 25)
-            f_p50 = np.percentile(gray, 50)
-            f_p75 = np.percentile(gray, 75)
-            f_p90 = np.percentile(gray, 90)
-            # Spatial energy / center mass
-            h, w = gray.shape
-            center_patch = gray[h//4:3*h//4, w//4:3*w//4]
-            f_center_mean = np.mean(center_patch)
-            f_center_std = np.std(center_patch)
-            # Gradients
-            dy, dx = np.gradient(gray)
-            f_grad_mag = np.mean(np.sqrt(dx**2 + dy**2))
-            
-            vec = [f_mean, f_std, f_max, f_min, f_p25, f_p50, f_p75, f_p90, f_center_mean, f_center_std, f_grad_mag]
-            features.append(vec)
-        return np.array(features, dtype=np.float32)
+        if len(X_images) == 0:
+            return np.zeros((0, 38), dtype=np.float32)
+
+        gray = np.mean(X_images, axis=-1)   # (N, H, W) grayscale
+        N, H, W = gray.shape
+
+        f_mean  = np.mean(gray, axis=(1, 2))
+        f_std   = np.std(gray, axis=(1, 2))
+        f_max   = np.max(gray, axis=(1, 2))
+        f_min   = np.min(gray, axis=(1, 2))
+
+        f_p10   = np.percentile(gray, 10, axis=(1, 2))
+        f_p25   = np.percentile(gray, 25, axis=(1, 2))
+        f_p50   = np.percentile(gray, 50, axis=(1, 2))
+        f_p75   = np.percentile(gray, 75, axis=(1, 2))
+        f_p90   = np.percentile(gray, 90, axis=(1, 2))
+
+        # 1. Spatial Quadrant Statistics (Top-Left, Top-Right, Bottom-Left, Bottom-Right)
+        q1 = gray[:, :H//2, :W//2]
+        q2 = gray[:, :H//2, W//2:]
+        q3 = gray[:, H//2:, :W//2]
+        q4 = gray[:, H//2:, W//2:]
+
+        q1_mean, q1_std = np.mean(q1, axis=(1, 2)), np.std(q1, axis=(1, 2))
+        q2_mean, q2_std = np.mean(q2, axis=(1, 2)), np.std(q2, axis=(1, 2))
+        q3_mean, q3_std = np.mean(q3, axis=(1, 2)), np.std(q3, axis=(1, 2))
+        q4_mean, q4_std = np.mean(q4, axis=(1, 2)), np.std(q4, axis=(1, 2))
+
+        # 2. Spatial centre-crop statistics (tumors are frequently central)
+        center = gray[:, H//4:3*H//4, W//4:3*W//4]
+        f_center_mean = np.mean(center, axis=(1, 2))
+        f_center_std  = np.std(center, axis=(1, 2))
+
+        # 3. Gradient magnitude & edge energy
+        dy, dx = np.gradient(gray, axis=(1, 2))
+        grad_mag = np.sqrt(dx**2 + dy**2)
+        f_grad_mean = np.mean(grad_mag, axis=(1, 2))
+        f_grad_std  = np.std(grad_mag, axis=(1, 2))
+        f_grad_p90  = np.percentile(grad_mag, 90, axis=(1, 2))
+
+        # 4. Laplacian variance — measures image sharpness / lesion border focus
+        lap = (
+            np.roll(gray, -1, axis=1) + np.roll(gray, 1, axis=1) +
+            np.roll(gray,  1, axis=2) + np.roll(gray,-1, axis=2) - 4 * gray
+        )
+        f_lap_var  = np.var(lap, axis=(1, 2))
+        f_lap_mean = np.mean(np.abs(lap), axis=(1, 2))
+
+        # 5. Per-channel color statistics (R, G, B)
+        f_r_mean = np.mean(X_images[:, :, :, 0], axis=(1, 2))
+        f_g_mean = np.mean(X_images[:, :, :, 1], axis=(1, 2))
+        f_b_mean = np.mean(X_images[:, :, :, 2], axis=(1, 2))
+
+        f_r_std  = np.std(X_images[:, :, :, 0], axis=(1, 2))
+        f_g_std  = np.std(X_images[:, :, :, 1], axis=(1, 2))
+        f_b_std  = np.std(X_images[:, :, :, 2], axis=(1, 2))
+
+        # 6. Local Texture Contrast Ratio (Center vs Outer ring)
+        f_contrast_ratio = (f_center_mean + 1e-5) / (f_mean + 1e-5)
+
+        features = np.column_stack([
+            f_mean, f_std, f_max, f_min,
+            f_p10, f_p25, f_p50, f_p75, f_p90,
+            q1_mean, q1_std, q2_mean, q2_std,
+            q3_mean, q3_std, q4_mean, q4_std,
+            f_center_mean, f_center_std,
+            f_grad_mean, f_grad_std, f_grad_p90,
+            f_lap_var, f_lap_mean,
+            f_r_mean, f_g_mean, f_b_mean,
+            f_r_std, f_g_std, f_b_std,
+            f_contrast_ratio
+        ])
+        return features.astype(np.float32)
 
