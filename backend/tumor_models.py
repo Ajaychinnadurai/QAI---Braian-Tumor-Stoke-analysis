@@ -688,6 +688,5 @@ class BrainTumorModelSuite:
         self.rf_model = data["rf"]
         self.dt_model = data["dt"]
         self.hqnn_model = data["hqnn"]
-        if not hasattr(self.hqnn_model, "vec_sim") or self.hqnn_model.vec_sim is None:
-            self.hqnn_model.vec_sim = VectorizedQuantumSimulator(n_qubits=self.hqnn_model.n_qubits)
+        self.hqnn_model.vec_sim = VectorizedQuantumSimulator(n_qubits=getattr(self.hqnn_model, "n_qubits", 4))
         self.metrics = data["metrics"]
