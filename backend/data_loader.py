@@ -130,12 +130,23 @@ def crop_brain_contour(img: Image.Image) -> Image.Image:
     """
     Crops extreme background and skull contour using Otsu-thresholding,
     focusing models purely on brain tissue parenchyma and intracranial lesions.
+    Ignores outer 5% border text and tick mark artifacts.
     """
     np_img = np.array(img.convert("L"))
-    
-    # Simple Otsu threshold
-    hist, bin_edges = np.histogram(np_img, bins=256, range=(0, 256))
-    total = np_img.size
+    h, w = np_img.shape
+
+    # Mask out outer 5% border artifacts (text, bounding lines, tick marks)
+    eval_mask = np.zeros_like(np_img, dtype=bool)
+    b_y, b_x = max(1, int(h * 0.05)), max(1, int(w * 0.05))
+    eval_mask[b_y:h-b_y, b_x:w-b_x] = True
+    eval_pixels = np_img[eval_mask]
+
+    if eval_pixels.size == 0:
+        return img
+
+    # Otsu thresholding on central evaluation region
+    hist, _ = np.histogram(eval_pixels, bins=256, range=(0, 256))
+    total = eval_pixels.size
     current_max, threshold = 0, 0
     sum_total = np.dot(np.arange(256), hist)
     sum_back, weight_back = 0, 0
@@ -156,7 +167,7 @@ def crop_brain_contour(img: Image.Image) -> Image.Image:
             threshold = i
 
     thresh_val = max(threshold, 35)
-    mask = np_img > thresh_val
+    mask = (np_img > thresh_val) & eval_mask
     coords = np.argwhere(mask)
     if coords.size == 0:
         return img
@@ -165,7 +176,6 @@ def crop_brain_contour(img: Image.Image) -> Image.Image:
     y1, x1 = coords.max(axis=0) + 1
     
     # Add small margin
-    h, w = np_img.shape
     y0 = max(0, y0 - 4)
     x0 = max(0, x0 - 4)
     y1 = min(h, y1 + 4)
