@@ -687,8 +687,9 @@ class BrainTumorModelSuite:
         }, path)
 
     def load_models(self, path: str):
+        import torch
+        import torch.storage
         if not torch.cuda.is_available():
-            import torch.storage
             orig_load = torch.storage._load_from_bytes
             def cpu_load(b):
                 return torch.load(io.BytesIO(b), map_location=torch.device("cpu"), weights_only=False)
