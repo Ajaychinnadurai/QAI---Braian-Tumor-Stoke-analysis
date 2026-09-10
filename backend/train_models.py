@@ -48,9 +48,8 @@ def train_and_save_all():
     print(f"  --> Saved stroke loader/scaler to: {stroke_scaler_path}")
 
     # 2. Brain Tumor MRI Pipeline
-    print("\n[2/2] Loading 100% Real Kaggle Brain Tumor MRI Scans with 5-Class Subtypes...")
+    print("\n[2/2] Loading 100% Real Kaggle Brain Tumor MRI Scans...")
     tumor_loader = TumorDataLoader()
-    # Force fresh scan when new images are downloaded or dataset changes
     cache_file = tumor_loader.cache_file
     if os.path.exists(cache_file):
         try:
@@ -58,18 +57,20 @@ def train_and_save_all():
         except Exception:
             pass
     X_img, y_multi, paths, y_bin = tumor_loader.load_multiclass_dataset(use_cache=False)
-    print(f"  Loaded {len(X_img)} Real MRI scans across 5 Histological Subtype Categories:")
+    num_classes = int(len(np.unique(y_multi)))
+    print(f"  Loaded {len(X_img)} Real MRI scans across {num_classes} Histological Subtype Categories:")
     print(f"    - Healthy Brain (No Tumor): {sum(y_multi == 0)}")
     print(f"    - Glioblastoma (GBM): {sum(y_multi == 1)}")
     print(f"    - Meningioma: {sum(y_multi == 2)}")
     print(f"    - Pituitary Adenoma: {sum(y_multi == 3)}")
-    print(f"    - Astrocytoma / Glioma: {sum(y_multi == 4)}")
+    if sum(y_multi == 4) > 0:
+        print(f"    - Astrocytoma: {sum(y_multi == 4)}")
     
     print("  Extracting multi-dimensional spatial & texture feature vectors...")
     X_feats = tumor_loader.extract_tabular_features_from_images(X_img)
     
     print("  Training Brain Tumor Multi-Class Suite (Deep 2D CNN, HQNN, Random Forest, Decision Tree)...")
-    tumor_suite = BrainTumorModelSuite(num_classes=5)
+    tumor_suite = BrainTumorModelSuite(num_classes=num_classes)
     tumor_suite.train_all(X_img, X_feats, y_multi)
     
     tumor_model_path = os.path.join(MODELS_DIR, "tumor_models.joblib")
