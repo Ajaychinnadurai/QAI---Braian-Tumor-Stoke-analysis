@@ -406,7 +406,10 @@ class HybridQuantumClassifier:
         
         W = getattr(self, "quantum_readout_weights", None)
         if W is None or W.shape[0] != H.shape[1]:
-            # Fallback uniform
+            if cnn_probs is not None:
+                if len(cnn_probs.shape) == 1:
+                    return np.expand_dims(cnn_probs, axis=0)
+                return cnn_probs
             exp_p = np.exp(H[:, :self.num_classes])
             return exp_p / np.sum(exp_p, axis=1, keepdims=True)
 
