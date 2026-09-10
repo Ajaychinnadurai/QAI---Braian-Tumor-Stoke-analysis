@@ -621,8 +621,8 @@ class BrainTumorModelSuite:
         pred_class = int(np.argmax(ensemble_probs))
         confidence = round(float(ensemble_probs[pred_class]) * 100, 2)
 
-        # Uncertainty Thresholding (If top ensemble confidence < 25.0%)
-        if confidence < 25.0:
+        # Uncertainty Thresholding (Only if top ensemble confidence < 15.0% for invalid inputs)
+        if confidence < 15.0:
             return {
                 "prediction": "Prediction: Uncertain / Inconclusive Scan",
                 "tumor_detected": False,
