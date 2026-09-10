@@ -266,13 +266,13 @@ class TumorDataLoader:
             folder_name = os.path.basename(d).lower()
             if any(k in folder_name for k in ["health", "notumor", "no_tumor"]):
                 folder_mapping[d] = 0
-            elif any(k in folder_name for k in ["glioblastoma", "gbm"]):
+            elif any(k in folder_name for k in ["glioblastoma", "gbm", "glioma"]):
                 folder_mapping[d] = 1
             elif "meningioma" in folder_name:
                 folder_mapping[d] = 2
             elif "pituitary" in folder_name:
                 folder_mapping[d] = 3
-            elif any(k in folder_name for k in ["astrocytoma", "glioma"]):
+            elif "astrocytoma" in folder_name:
                 folder_mapping[d] = 4
 
         if len(set(folder_mapping.values())) >= 2:
@@ -283,12 +283,8 @@ class TumorDataLoader:
                         with Image.open(p) as img:
                             arr, _ = self.preprocess_image(img)
                             images.append(arr)
-                            # Split glioma scans between Glioblastoma (Class 1) and Astrocytoma (Class 4)
-                            assigned_class = cls_id
-                            if cls_id == 4:
-                                assigned_class = 1 if (idx % 2 == 0) else 4
-                            labels_multi.append(assigned_class)
-                            labels_bin.append(0 if assigned_class == 0 else 1)
+                            labels_multi.append(cls_id)
+                            labels_bin.append(0 if cls_id == 0 else 1)
                             file_paths.append(p)
                     except Exception:
                         pass
