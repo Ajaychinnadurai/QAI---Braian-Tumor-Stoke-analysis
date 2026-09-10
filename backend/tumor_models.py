@@ -432,8 +432,8 @@ class HybridQuantumClassifier:
 class BrainTumorModelSuite:
     def __init__(self, num_classes: int = 5):
         self.num_classes = num_classes
-        # High-Precision GPU Training (epochs=12, batch_size=64, lr=0.001) for Base1.pdf accuracy
-        self.cnn_model = PyTorchCNNTumorClassifier(epochs=12, batch_size=64, lr=0.001, num_classes=num_classes)
+        # High-Precision GPU Training (epochs=30, batch_size=64, lr=0.001) for Base1.pdf accuracy
+        self.cnn_model = PyTorchCNNTumorClassifier(epochs=30, batch_size=64, lr=0.001, num_classes=num_classes)
         self.rf_model  = RandomForestClassifier(
             n_estimators=400, max_depth=20, min_samples_split=2,
             max_features='sqrt', class_weight='balanced', random_state=42, n_jobs=-1
