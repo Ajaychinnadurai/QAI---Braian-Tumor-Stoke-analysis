@@ -258,9 +258,11 @@ class TumorDataLoader:
         labels_bin = []
         file_paths = []
 
-        # 1. Search for any standard Kaggle subfolders
-        all_subdirs = [d for d in glob.glob(os.path.join(self.base_tumor_dir, "*")) if os.path.isdir(d)]
-        
+        # 1. Search for standard Kaggle subfolders recursively
+        all_subdirs = [d for d in glob.glob(os.path.join(self.base_tumor_dir, "**", "*"), recursive=True) if os.path.isdir(d)]
+        if not all_subdirs:
+            all_subdirs = [d for d in glob.glob(os.path.join(self.base_tumor_dir, "*")) if os.path.isdir(d)]
+
         folder_mapping = {}
         for d in all_subdirs:
             folder_name = os.path.basename(d).lower()
@@ -274,6 +276,26 @@ class TumorDataLoader:
                 folder_mapping[d] = 3
             elif "astrocytoma" in folder_name:
                 folder_mapping[d] = 4
+
+        # If full 4 multi-class subfolders aren't locally present, automatically fetch via KaggleHub
+        if len(set(folder_mapping.values())) < 4:
+            try:
+                import kagglehub
+                print("  [KaggleHub] Fetching full 3,264 Kaggle Brain Tumor MRI Dataset...")
+                kh_path = kagglehub.dataset_download("masoudnickparvar/brain-tumor-mri-dataset")
+                kh_subdirs = [d for d in glob.glob(os.path.join(kh_path, "**", "*"), recursive=True) if os.path.isdir(d)]
+                for d in kh_subdirs:
+                    folder_name = os.path.basename(d).lower()
+                    if any(k in folder_name for k in ["health", "notumor", "no_tumor"]):
+                        folder_mapping[d] = 0
+                    elif any(k in folder_name for k in ["glioblastoma", "gbm", "glioma"]):
+                        folder_mapping[d] = 1
+                    elif "meningioma" in folder_name:
+                        folder_mapping[d] = 2
+                    elif "pituitary" in folder_name:
+                        folder_mapping[d] = 3
+            except Exception as e:
+                print(f"  [KaggleHub Note] Could not download full dataset: {e}")
 
         if len(set(folder_mapping.values())) >= 2:
             for folder_path, cls_id in folder_mapping.items():
