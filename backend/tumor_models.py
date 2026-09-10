@@ -181,7 +181,7 @@ class PyTorchCNNTumorClassifier:
     High-Accuracy SE-Residual PyTorch 2D CNN wrapper.
     Trains with stronger augmentation and cosine-annealing LR on the full 1,564-image dataset.
     """
-    def __init__(self, epochs: int = 40, batch_size: int = 32, lr: float = 0.002, num_classes: int = 5):
+    def __init__(self, epochs: int = 30, batch_size: int = 32, lr: float = 0.002, num_classes: int = 5):
         self.epochs = epochs
         self.batch_size = batch_size
         self.lr = lr
@@ -244,6 +244,8 @@ class PyTorchCNNTumorClassifier:
                 n_batches += 1
 
             scheduler.step()
+            avg_loss = total_loss / max(1, n_batches)
+            print(f"     [Epoch {epoch+1:02d}/{self.epochs:02d}] Training Loss: {avg_loss:.4f}", flush=True)
 
             # Fast batched validation evaluation
             if validation_data is None:
