@@ -678,6 +678,7 @@ class BrainTumorModelSuite:
 
     def save_models(self, path: str):
         joblib.dump({
+            "num_classes": self.num_classes,
             "cnn_state": self.cnn_model.get_state(),
             "rf": self.rf_model,
             "dt": self.dt_model,
@@ -701,7 +702,14 @@ class BrainTumorModelSuite:
         else:
             data = joblib.load(path)
 
-        self.cnn_model = PyTorchCNNTumorClassifier()
+        if "num_classes" in data:
+            self.num_classes = data["num_classes"]
+        elif "cnn_state" in data and "model.classifier.weight" in data["cnn_state"]:
+            self.num_classes = data["cnn_state"]["model.classifier.weight"].shape[0]
+        else:
+            self.num_classes = 4
+
+        self.cnn_model = PyTorchCNNTumorClassifier(num_classes=self.num_classes)
         if "cnn_state" in data:
             self.cnn_model.set_state(data["cnn_state"])
         elif "cnn" in data:
@@ -709,5 +717,6 @@ class BrainTumorModelSuite:
         self.rf_model = data["rf"]
         self.dt_model = data["dt"]
         self.hqnn_model = data["hqnn"]
+        self.hqnn_model.num_classes = self.num_classes
         self.hqnn_model.vec_sim = VectorizedQuantumSimulator(n_qubits=getattr(self.hqnn_model, "n_qubits", 4))
         self.metrics = data["metrics"]
