@@ -180,7 +180,7 @@ class HealthcareRequestHandler(BaseHTTPRequestHandler):
 
         elif url_path == "/api/dataset/samples":
             # Return real sample MRI scans separated by subtype and real patient records
-            subtypes = ["healthy", "glioblastoma", "meningioma", "pituitary", "astrocytoma"]
+            subtypes = ["healthy", "glioblastoma", "meningioma", "pituitary"]
             mri_samples = {}
             for st in subtypes:
                 st_dir = os.path.join(DATA_DIR, "brain_tumor", st)

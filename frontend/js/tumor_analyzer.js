@@ -90,7 +90,6 @@ async function loadSampleMriPresets() {
       { id: "mriGbmPresets", key: "glioblastoma_scans", type: "glioblastoma" },
       { id: "mriMeningiomaPresets", key: "meningioma_scans", type: "meningioma" },
       { id: "mriPituitaryPresets", key: "pituitary_scans", type: "pituitary" },
-      { id: "mriAstrocytomaPresets", key: "astrocytoma_scans", type: "astrocytoma" },
       { id: "mriHealthyPresets", key: "healthy_scans", type: "healthy" }
     ];
 
