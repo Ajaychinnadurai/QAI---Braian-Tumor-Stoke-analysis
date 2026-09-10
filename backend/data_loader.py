@@ -220,10 +220,9 @@ class TumorDataLoader:
         self.no_dir = os.path.join(base_tumor_dir, "no")
 
     def preprocess_image(self, img: Image.Image) -> Tuple[np.ndarray, Image.Image]:
-        """Applies contour cropping, CLAHE enhancement, and resizing."""
+        """Applies contour cropping and bilinear resizing."""
         cropped = crop_brain_contour(img.convert("RGB"))
-        enhanced = apply_clahe_enhancement(cropped)
-        resized = enhanced.resize(self.target_size, Image.Resampling.BILINEAR)
+        resized = cropped.resize(self.target_size, Image.Resampling.BILINEAR)
         arr = np.array(resized, dtype=np.float32) / 255.0  # Normalized [0, 1]
         return arr, resized
 
