@@ -610,11 +610,19 @@ class BrainTumorModelSuite:
         rf_probs = self.rf_model.predict_proba(feats_input)[0]
         dt_probs = self.dt_model.predict_proba(feats_input)[0]
 
-        pred_class = int(np.argmax(hqnn_probs))
-        confidence = round(float(hqnn_probs[pred_class]) * 100, 2)
+        # Multi-model weighted ensemble consensus
+        ensemble_probs = (
+            0.45 * cnn_probs + 
+            0.25 * hqnn_probs + 
+            0.15 * rf_probs + 
+            0.15 * dt_probs
+        )
 
-        # Task 12: Uncertainty Thresholding (If confidence < 35.0%)
-        if confidence < 35.0:
+        pred_class = int(np.argmax(ensemble_probs))
+        confidence = round(float(ensemble_probs[pred_class]) * 100, 2)
+
+        # Uncertainty Thresholding (If top ensemble confidence < 25.0%)
+        if confidence < 25.0:
             return {
                 "prediction": "Prediction: Uncertain / Inconclusive Scan",
                 "tumor_detected": False,
@@ -626,7 +634,7 @@ class BrainTumorModelSuite:
                 "badge_color": "#F59E0B",
                 "confidence_score": confidence,
                 "probability_percentage": confidence,
-                "class_probabilities": {TUMOR_CLASSES[cid]["short_name"]: round(float(hqnn_probs[cid]) * 100, 2) for cid in range(self.num_classes)},
+                "class_probabilities": {TUMOR_CLASSES[cid]["short_name"]: round(float(ensemble_probs[cid]) * 100, 2) for cid in range(self.num_classes)},
                 "individual_models": {
                     "HQNN (Quantum)": f"{TUMOR_CLASSES[int(np.argmax(hqnn_probs))]['short_name']} ({round(float(np.max(hqnn_probs))*100, 1)}%)",
                     "Deep 2D CNN": f"{TUMOR_CLASSES[int(np.argmax(cnn_probs))]['short_name']} ({round(float(np.max(cnn_probs))*100, 1)}%)",
@@ -653,7 +661,7 @@ class BrainTumorModelSuite:
         class_distribution = {}
         for cid in range(self.num_classes):
             c_name = TUMOR_CLASSES[cid]["short_name"]
-            class_distribution[c_name] = round(float(hqnn_probs[cid]) * 100, 2)
+            class_distribution[c_name] = round(float(ensemble_probs[cid]) * 100, 2)
 
         return {
             "prediction": f"Tumor Detected: {class_meta['name']}" if has_tumor else "No Tumor Detected (Healthy Brain)",
@@ -665,7 +673,7 @@ class BrainTumorModelSuite:
             "recommended_protocol": class_meta["protocol"],
             "badge_color": class_meta["color"],
             "confidence_score": confidence,
-            "probability_percentage": round(float(100.0 - hqnn_probs[0] * 100) if has_tumor else round(float(hqnn_probs[0] * 100), 2), 2),
+            "probability_percentage": round(float((1.0 - ensemble_probs[0]) * 100) if has_tumor else round(float(ensemble_probs[0] * 100), 2), 2),
             "class_probabilities": class_distribution,
             "individual_models": {
                 "HQNN (Quantum)": f"{TUMOR_CLASSES[int(np.argmax(hqnn_probs))]['short_name']} ({round(float(np.max(hqnn_probs))*100, 1)}%)",
