@@ -466,8 +466,8 @@ class BrainTumorModelSuite:
             X_img, X_feats, y, test_size=0.20, random_state=42, stratify=y
         )
 
-        # 1. Train Custom 2D Deep CNN (15 epochs, SE-Residual architecture)
-        print("    -> Training SE-Residual CNN (15 epochs for maximum diagnostic precision)...")
+        # 1. Train Custom 2D Deep CNN (30 epochs, SE-Residual architecture)
+        print("    -> Training SE-Residual CNN (30 epochs for maximum diagnostic precision)...")
         self.cnn_model.fit(X_tr_img, y_train, validation_data=(X_te_img, y_test))
 
         # 2. Train Random Forest
