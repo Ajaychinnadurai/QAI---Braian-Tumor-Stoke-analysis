@@ -12,6 +12,7 @@ Implements:
 """
 
 import os
+import io
 import copy
 import warnings
 warnings.filterwarnings("ignore")
@@ -291,8 +292,9 @@ class PyTorchCNNTumorClassifier:
         return np.argmax(probs, axis=1)
 
     def get_state(self) -> Dict[str, Any]:
+        cpu_sd = {k: v.cpu() if isinstance(v, torch.Tensor) else v for k, v in self.model.state_dict().items()}
         return {
-            "state_dict": self.model.state_dict(),
+            "state_dict": cpu_sd,
             "epochs": self.epochs,
             "lr": self.lr,
             "num_classes": self.num_classes
@@ -302,7 +304,10 @@ class PyTorchCNNTumorClassifier:
         num_classes = state.get("num_classes", 5)
         self.num_classes = num_classes
         self.model = CustomBrainTumorCNN(num_classes=num_classes).to(self.device)
-        self.model.load_state_dict(state["state_dict"])
+        sd = state["state_dict"]
+        if not torch.cuda.is_available():
+            sd = {k: v.cpu() if isinstance(v, torch.Tensor) else v for k, v in sd.items()}
+        self.model.load_state_dict(sd)
         self.model.eval()
 
 
@@ -682,7 +687,19 @@ class BrainTumorModelSuite:
         }, path)
 
     def load_models(self, path: str):
-        data = joblib.load(path)
+        if not torch.cuda.is_available():
+            import torch.storage
+            orig_load = torch.storage._load_from_bytes
+            def cpu_load(b):
+                return torch.load(io.BytesIO(b), map_location=torch.device("cpu"), weights_only=False)
+            try:
+                torch.storage._load_from_bytes = cpu_load
+                data = joblib.load(path)
+            finally:
+                torch.storage._load_from_bytes = orig_load
+        else:
+            data = joblib.load(path)
+
         self.cnn_model = PyTorchCNNTumorClassifier()
         if "cnn_state" in data:
             self.cnn_model.set_state(data["cnn_state"])
