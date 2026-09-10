@@ -175,11 +175,13 @@ def crop_brain_contour(img: Image.Image) -> Image.Image:
     y0, x0 = coords.min(axis=0)
     y1, x1 = coords.max(axis=0) + 1
     
-    # Add small margin
-    y0 = max(0, y0 - 4)
-    x0 = max(0, x0 - 4)
-    y1 = min(h, y1 + 4)
-    x1 = min(w, x1 + 4)
+    # Add safety margin to preserve peripheral skull/dural tumor lesions
+    pad_y = max(10, int(h * 0.08))
+    pad_x = max(10, int(w * 0.08))
+    y0 = max(0, y0 - pad_y)
+    x0 = max(0, x0 - pad_x)
+    y1 = min(h, y1 + pad_y)
+    x1 = min(w, x1 + pad_x)
     
     return img.crop((x0, y0, x1, y1))
 
