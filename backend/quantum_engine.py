@@ -18,29 +18,45 @@ import numpy as np
 from typing import Dict, List, Any, Tuple
 
 # ── Qiskit core ──────────────────────────────────────────────────────────────
-from qiskit import QuantumCircuit
-from qiskit.quantum_info import Statevector, partial_trace, DensityMatrix
-from qiskit.circuit.library import HGate, XGate, YGate, ZGate, SGate, TGate, CXGate, UGate
+try:
+    from qiskit import QuantumCircuit
+    from qiskit.quantum_info import Statevector, partial_trace, DensityMatrix
+    from qiskit.circuit.library import HGate, XGate, YGate, ZGate, SGate, TGate, CXGate, UGate
+    HAS_QISKIT = True
+except ImportError:
+    HAS_QISKIT = False
+    QuantumCircuit = None
 
 # ── Aer statevector simulator ─────────────────────────────────────────────────
-try:
-    from qiskit_aer import AerSimulator
-    from qiskit_aer.primitives import StatevectorSampler
-    _backend = AerSimulator(method="statevector")
-    HAS_AER = True
-except ImportError:
-    # Fallback: use Qiskit's built-in Statevector (no Aer needed)
+if HAS_QISKIT:
+    try:
+        from qiskit_aer import AerSimulator
+        from qiskit_aer.primitives import StatevectorSampler
+        _backend = AerSimulator(method="statevector")
+        HAS_AER = True
+    except ImportError:
+        _backend = None
+        HAS_AER = False
+else:
     _backend = None
     HAS_AER = False
 
 # ── Gate matrices kept for backward compatibility with stroke_models / HQNN ──
 I2 = np.eye(2, dtype=complex)
-H  = HGate().to_matrix()
-X  = XGate().to_matrix()
-Y  = YGate().to_matrix()
-Z  = ZGate().to_matrix()
-S  = SGate().to_matrix()
-T  = TGate().to_matrix()
+if HAS_QISKIT:
+    H  = HGate().to_matrix()
+    X  = XGate().to_matrix()
+    Y  = YGate().to_matrix()
+    Z  = ZGate().to_matrix()
+    S  = SGate().to_matrix()
+    T  = TGate().to_matrix()
+else:
+    H  = np.array([[1, 1], [1, -1]], dtype=complex) / np.sqrt(2)
+    X  = np.array([[0, 1], [1, 0]], dtype=complex)
+    Y  = np.array([[0, -1j], [1j, 0]], dtype=complex)
+    Z  = np.array([[1, 0], [0, -1]], dtype=complex)
+    S  = np.array([[1, 0], [0, 1j]], dtype=complex)
+    T  = np.array([[1, 0], [0, np.exp(1j * np.pi / 4)]], dtype=complex)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
